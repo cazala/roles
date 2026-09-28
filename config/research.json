@@ -1,0 +1,65 @@
+{
+  "sources": {
+    "safeWei": "4ba19e520ce3af9d8310419d4259dd6ef0db8e8d",
+    "zodiac": "89352c4f05d4b223b9c555ca963a787fd930da2d",
+    "rolesRelease": "218a5164d739c107b132034436978e78cdd90c95",
+    "safeDeployments": "7b1fb6d615ab2d2999550ec9166554b180e813e5"
+  },
+  "contracts": {
+    "roles": {
+      "address": "0xf2964ce6161ce0e75964fe7927ce114cb0b283d5",
+      "version": "2.1.1",
+      "runtimeBytes": 24409,
+      "runtimeSha256": "89c5dc3313b5669f669232de7033734b4ee10339297cdf523bee5eb1b093cd05"
+    },
+    "factory": {
+      "address": "0x00000000000dc7f163742eb4abef650037b1f588",
+      "version": "1.1.0",
+      "runtimeBytes": 1953,
+      "runtimeSha256": "3c51a2178fe8cec04ab7b87a0c25bace364963905d1aa3967c18608b8758628c"
+    },
+    "multiSend": {
+      "address": "0x9641d764fc13c8b624c04430c7356c1c7c8102e2",
+      "version": "1.4.1",
+      "runtimeBytes": 410,
+      "runtimeSha256": "184ce47fec35ba37e711aa66a41e58e65f68b882ec1100ecada1fa4173c813a5"
+    }
+  },
+  "chains": {
+    "1": {
+      "name": "Ethereum",
+      "block": 26071000,
+      "blockHash": "0x124596668a96ab9600ff3e408a90f1ad453201fd4fcdc3d277934022cdbe3cb0",
+      "timestamp": 1790538791
+    },
+    "100": {
+      "name": "Gnosis",
+      "block": 48479326,
+      "blockHash": "0xb65f095da52192b54fa186468c099335779fbe78106064529e8cca8a427e4964",
+      "timestamp": 1790583220
+    },
+    "137": {
+      "name": "Polygon",
+      "block": 94585388,
+      "blockHash": "0x6fc652c249853ddb46bf8280c70c5729e2f75f3857bf75891a1937d4282a1a17",
+      "timestamp": 1790583222
+    }
+  },
+  "fixture": {
+    "chainId": 1,
+    "address": "0xd1f7cd1c68a7f82ad86d320d2446eb706822f742",
+    "version": "2.1.0",
+    "faulty": true,
+    "mastercopy": "0x9646fdad06d3e24444381f44362a3b0eb343d337",
+    "code": "0x363d3d373d3d3d363d739646fdad06d3e24444381f44362a3b0eb343d3375af43d82803e903d91602b57fd5bf3",
+    "owner": "0x846e7f810e08f1e2af2c5afd06847cc95f5cae1b",
+    "avatar": "0x846e7f810e08f1e2af2c5afd06847cc95f5cae1b",
+    "target": "0x846e7f810e08f1e2af2c5afd06847cc95f5cae1b"
+  },
+  "fixtureGetters": {
+    "owner": "0x8da5cb5b",
+    "avatar": "0x5aef7de6",
+    "target": "0xd4b83992"
+  },
+  "abiSha256": "67f30020e8f0294542ea363d70af814e5875d893da5a14c26e7a6eb9a5c9cbe5"
+}

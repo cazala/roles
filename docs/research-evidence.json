@@ -1,0 +1,84 @@
+[
+  {
+    "chainId": 1,
+    "name": "Ethereum",
+    "block": 26071000,
+    "blockHash": "0x124596668a96ab9600ff3e408a90f1ad453201fd4fcdc3d277934022cdbe3cb0",
+    "timestamp": 1790538791,
+    "contracts": {
+      "roles": {
+        "address": "0xf2964ce6161ce0e75964fe7927ce114cb0b283d5",
+        "bytes": 24409,
+        "sha256": "89c5dc3313b5669f669232de7033734b4ee10339297cdf523bee5eb1b093cd05"
+      },
+      "factory": {
+        "address": "0x00000000000dc7f163742eb4abef650037b1f588",
+        "bytes": 1953,
+        "sha256": "3c51a2178fe8cec04ab7b87a0c25bace364963905d1aa3967c18608b8758628c"
+      },
+      "multiSend": {
+        "address": "0x9641d764fc13c8b624c04430c7356c1c7c8102e2",
+        "bytes": 410,
+        "sha256": "184ce47fec35ba37e711aa66a41e58e65f68b882ec1100ecada1fa4173c813a5"
+      }
+    },
+    "fixture": {
+      "address": "0xd1f7cd1c68a7f82ad86d320d2446eb706822f742",
+      "code": "0x363d3d373d3d3d363d739646fdad06d3e24444381f44362a3b0eb343d3375af43d82803e903d91602b57fd5bf3",
+      "owner": "0x846e7f810e08f1e2af2c5afd06847cc95f5cae1b",
+      "avatar": "0x846e7f810e08f1e2af2c5afd06847cc95f5cae1b",
+      "target": "0x846e7f810e08f1e2af2c5afd06847cc95f5cae1b",
+      "sampleLogs": {
+        "error": "{\"message\":\"ranges over 10000 blocks are not supported on free plan\",\"code\":35}"
+      }
+    }
+  },
+  {
+    "chainId": 100,
+    "name": "Gnosis",
+    "block": 48479326,
+    "blockHash": "0xb65f095da52192b54fa186468c099335779fbe78106064529e8cca8a427e4964",
+    "timestamp": 1790583220,
+    "contracts": {
+      "roles": {
+        "address": "0xf2964ce6161ce0e75964fe7927ce114cb0b283d5",
+        "bytes": 24409,
+        "sha256": "89c5dc3313b5669f669232de7033734b4ee10339297cdf523bee5eb1b093cd05"
+      },
+      "factory": {
+        "address": "0x00000000000dc7f163742eb4abef650037b1f588",
+        "bytes": 1953,
+        "sha256": "3c51a2178fe8cec04ab7b87a0c25bace364963905d1aa3967c18608b8758628c"
+      },
+      "multiSend": {
+        "address": "0x9641d764fc13c8b624c04430c7356c1c7c8102e2",
+        "bytes": 410,
+        "sha256": "184ce47fec35ba37e711aa66a41e58e65f68b882ec1100ecada1fa4173c813a5"
+      }
+    }
+  },
+  {
+    "chainId": 137,
+    "name": "Polygon",
+    "block": 94585388,
+    "blockHash": "0x6fc652c249853ddb46bf8280c70c5729e2f75f3857bf75891a1937d4282a1a17",
+    "timestamp": 1790583222,
+    "contracts": {
+      "roles": {
+        "address": "0xf2964ce6161ce0e75964fe7927ce114cb0b283d5",
+        "bytes": 24409,
+        "sha256": "89c5dc3313b5669f669232de7033734b4ee10339297cdf523bee5eb1b093cd05"
+      },
+      "factory": {
+        "address": "0x00000000000dc7f163742eb4abef650037b1f588",
+        "bytes": 1953,
+        "sha256": "3c51a2178fe8cec04ab7b87a0c25bace364963905d1aa3967c18608b8758628c"
+      },
+      "multiSend": {
+        "address": "0x9641d764fc13c8b624c04430c7356c1c7c8102e2",
+        "bytes": 410,
+        "sha256": "184ce47fec35ba37e711aa66a41e58e65f68b882ec1100ecada1fa4173c813a5"
+      }
+    }
+  }
+]
