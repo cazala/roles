@@ -77,6 +77,7 @@ function home() {
 }
 export async function route() {
   const epoch = ++session.epoch;
+  put($('batch'));
   const path = location.hash.replace(/^#\/?/, '').split('?')[0].split('/');
   if (!path[0]) return home();
   if (!session.account) { put(main, h('div.home.gate', h('div.panel.gatecard', h('span.mark', icon(...ICONS.shield)), h('h2', 'Connect a wallet to open this address'), h('p', 'Chain reads use your wallet’s RPC.'), h('button.primary', { onclick: () => requireWallet(route) }, 'Connect a wallet')))); return; }
