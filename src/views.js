@@ -1,11 +1,12 @@
 import { editBody } from './edit.js';
+import { createView } from './create.js';
 import { conditionView, allowanceView } from './condition-view.js';
 import { h, put, addr, bad, warn, act, short } from './ui.js';
 import { session, route } from './app.js';
 import { identify, metadata, safeModules, replay, keyName, json, quantity } from './roles.js';
 import { scan, clearScan } from './scan.js';
 
-export const hooks = { conditions: conditionView, allowances: allowanceView, body: editBody };
+export const hooks = { conditions: conditionView, allowances: allowanceView, body: editBody, create: createView };
 export const tabbar = (address, active) => h('nav.tabs', ['roles', 'allowances'].map(name => h('a' + (name === active ? '.on' : ''), { href: '#/' + address + (name === 'roles' ? '' : '/' + name) }, name[0].toUpperCase() + name.slice(1))));
 const options = n => ['CALL, no ETH', 'CALL with ETH', 'CALL or DELEGATECALL, no ETH', 'CALL or DELEGATECALL with ETH'][n];
 export function roleView(ctx, key) {
