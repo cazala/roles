@@ -82,7 +82,8 @@ export async function startFork(port = 18545 + Math.floor(Math.random() * 1000),
 
 /** Send a tx from an unlocked account and wait for success. */
 export async function tx(rpc, from, to, data = '0x', value = 0n) {
-  const h = await rpc('eth_sendTransaction', [{ from, to, data, value: '0x' + value.toString(16) }]);
+  // Time-travel tests may execute a refill path absent from latest-block gas estimation.
+  const h = await rpc('eth_sendTransaction', [{ from, to, data, value: '0x' + value.toString(16), gas: '0xe4e1c0' }]);
   let r;
   while (!(r = await rpc('eth_getTransactionReceipt', [h]))) await new Promise((f) => setTimeout(f, 20));
   if (r.status !== '0x1') throw Error('reverted');
