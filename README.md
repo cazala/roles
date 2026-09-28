@@ -11,7 +11,7 @@ Read these before writing code:
 
 ## Current status
 
-Phases 0–6 are implemented: the wallet shell, module discovery, resumable permissions reader, condition explanations, live allowance balances, pending edits, verified safe.wei hand-offs, deterministic modifier creation and simulated member execution. Condition authoring follows in the remaining phases.
+Phases 0–7 are implemented: the wallet shell, module discovery, resumable permissions reader, condition explanations, live allowances, pending edits, safe.wei hand-offs, deterministic creation, simulated member execution and ABI-derived condition authoring. The final phase is polish, deployment rehearsal and handoff documentation.
 
 ```sh
 npm ci
