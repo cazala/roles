@@ -51,3 +51,11 @@ npm run deployer -- --anvil http://127.0.0.1:18600
 The same `dist/index.html` is published by CI to the `roles-wei` Pages project. Pull requests receive a branch preview; pushes to `main` update `roles.caza.la`. The workflow adds anti-framing, MIME-sniffing and referrer headers. Repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` authorize Pages, while `ALCHEMY_API_KEY` gives fork tests an archive RPC.
 
 Never put a private key or Cloudflare token in shell history, the repository or the deployer page.
+
+## Latest clean rehearsal
+
+Phase 8 was rehearsed on a fresh pinned mainnet fork on 2026-09-28. The 111,627-byte page deployed in five chunks plus the app contract, used 25,177,704 gas, and `html()` matched `dist/index.html` byte for byte.
+
+- App: `0x87150d22a9500ad12cd2c52d18cea24937d3d730`
+- Content hash: `0x84ed550e83f15a5dfb9deda395952c50f270c54cec7436b07bb4711f6112fecf`
+- Runtime code hash: `0x0be3051eca1c6af87a2ad2574b010806b0f3d1295cbe9141c9c8242c75de9f55`

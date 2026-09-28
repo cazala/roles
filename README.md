@@ -13,6 +13,8 @@ Read these before writing code:
 
 All implementation phases are complete: the wallet shell, module discovery, resumable permissions reader, condition explanations, live allowances, pending edits, safe.wei hand-offs, deterministic creation, simulated member execution, ABI-derived condition authoring, mobile states and deployment tooling. CI publishes `main` to [roles.caza.la](https://roles.caza.la). Mainnet deployment and pointing `roles.wei` remain owner actions; follow [the deployment handoff](docs/deploy.md).
 
+The final clean build is 111,627 bytes. Its fork-rehearsed CREATE2 app is `0x87150d22a9500ad12cd2c52d18cea24937d3d730`, with content hash `0x84ed550e83f15a5dfb9deda395952c50f270c54cec7436b07bb4711f6112fecf`; `html()` matched the build byte for byte using 25,177,704 gas.
+
 ```sh
 npm ci
 npm run build
