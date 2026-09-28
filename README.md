@@ -23,7 +23,7 @@ Reproduce the read-only Ethereum checks with Node 22 or later:
 RPC_URL=https://eth.drpc.org CHAIN_ID=1 node scripts/verify-research.mjs
 ```
 
-No npm installation is needed for phase 0. Public RPC history limits vary; use an archive endpoint if the command fails. These development RPCs are never part of the production app. The next phase is the copied safe.wei shell/build/dev wallet, after the phase 0 PR is merged. A GitHub repository destination is still needed for the required PR workflow.
+No npm installation is needed for phase 0. Public RPC history limits vary; use an archive endpoint if the command fails. These development RPCs are never part of the production app. The next phase is the copied safe.wei shell/build/dev wallet, after the phase 0 PR is merged. The private repository is `cazala/roles`.
 
 ---
 
