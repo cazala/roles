@@ -1,3 +1,4 @@
+import { renderAddress } from './views.js';
 import { $, h, put, addr, short, icon, ICONS, sheet, bad, act, setResolver } from './ui.js';
 import { isAddr } from './abi.js';
 import { use, rpc } from './rpc.js';
@@ -74,12 +75,6 @@ function home() {
   input.oninput = draw;
   put(main, h('div.home' + (saved.length ? '.returning' : ''), !saved.length && h('div.hero', h('span.mark', icon(...ICONS.shield)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.')), h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint', 'You’ll connect your wallet to open it.'), out), rows)); draw();
 }
-export let renderAddress = async address => {
-  const code = await rpc('eth_getCode', [address, 'latest']);
-  if (code === '0x') throw Error('No contract at this address on ' + network(session.chain) + '.');
-  return h('div', h('h1', 'Contract'), addr(address), h('p.mut', 'Connected. Roles inspection arrives in phase 2.'));
-};
-export const setAddressRenderer = fn => { renderAddress = fn; };
 export async function route() {
   const epoch = ++session.epoch;
   const path = location.hash.replace(/^#\/?/, '').split('?')[0].split('/');

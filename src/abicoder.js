@@ -243,6 +243,15 @@ function decodeAt(p, h, pos) {
   return v;
 }
 
+/** ABI return/event data. Reject noncanonical encodings by round trip. */
+export const encodeParameters = (params, values) => '0x' + encodeList(params.map((p, i) => ({ p, v: values[i] })));
+export function decodeParameters(params, data) {
+  if (!isHex(data)) throw Error('Invalid ABI bytes');
+  const values = decodeList(params, strip(data).toLowerCase(), 0);
+  if (encodeParameters(params, values) !== data.toLowerCase()) throw Error('Noncanonical ABI data');
+  return values;
+}
+
 /**
  * Decode `data` with the first of `signatures` (human-readable lines) whose selector matches and
  * whose decoded values re-encode to exactly `data`. Returns { f, values, signature } or null.
