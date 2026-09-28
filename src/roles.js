@@ -53,8 +53,8 @@ export function decodeEvent(log) {
 export const emptyState = () => ({ roles: {}, enabled: {}, defaults: {}, allowances: {}, unwrappers: {}, unknown: 0 });
 export const role = (s, key) => s.roles[key] ||= { key, members: {}, targets: {} };
 export const target = (s, key, address) => role(s, key).targets[address] ||= { address, clearance: 0, options: 0, functions: {} };
-export function replay(logs) {
-  const state = emptyState(), seen = new Set();
+export function replay(logs, initial) {
+  const state = initial ? structuredClone(initial) : emptyState(), seen = new Set();
   const ordered = [...logs].sort((a, b) => Number(BigInt(a.blockNumber) - BigInt(b.blockNumber)) || Number(BigInt(a.transactionIndex || 0) - BigInt(b.transactionIndex || 0)) || Number(BigInt(a.logIndex) - BigInt(b.logIndex)));
   for (const log of ordered) {
     if (log.removed) throw Error('Removed log: refresh chain history');

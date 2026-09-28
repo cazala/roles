@@ -12,9 +12,12 @@ const js = (await build({ entryPoints: [root + 'src/app.js'], bundle: true, mini
 const css = (await transform(read('src/style.css'), { loader: 'css', minify: true })).code.trim();
 if (/<\/script/i.test(js)) throw Error('Unsafe inline script terminator');
 const html = read('src/index.html').replace(/>\s+</g, '><').replace('<!--CSS-->', () => '<style>' + css + '</style>').replace('<!--JS-->', () => '<script>' + js + '</script>');
-for (const re of [/<script[^>]+src\s*=/i, /<link[^>]+rel=["']?stylesheet/i, /@import/i, /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|importScripts)\s*\(/, /\bimport\s*\(/, /(?:src|poster)\s*=\s*["']?(?:https?:)?\/\//i, /url\(\s*["']?(?!data:|#)[^)]/i]) {
+for (const re of [/<script[^>]+src\s*=/i, /<link[^>]+rel=["']?stylesheet/i, /@import/i, /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|importScripts)\s*\(/, /\bimport\s*\(/, /(?:src|poster)\s*=\s*["']?(?:https?:)?\/\//i]) {
   if (re.test(html)) throw Error('Remote resource/network loader check failed: ' + re);
 }
+// Scan CSS separately: the case-insensitive HTML regex would mistake JavaScript's
+// `new URL(...)` constructor for a CSS url(...) resource reference.
+if (/url\(\s*["']?(?!data:|#)[^)]/i.test(css)) throw Error('Remote CSS resource check failed');
 const raw = Buffer.byteLength(html), gzip = gzipSync(html).length;
 if (raw > 200000) throw Error('Production HTML exceeds 200,000 bytes');
 mkdirSync(root + 'dist', { recursive: true });
