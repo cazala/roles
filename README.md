@@ -9,6 +9,22 @@ Read these before writing code:
 - [AGENTS.md](AGENTS.md): working rules (commits, PRs, what not to break).
 - safe.wei's `docs/links.md`: the stable link formats roles.wei uses to talk to safe.wei.
 
+## Current status
+
+Phase 0 research is prepared on `phase-0-research`; the application is not built yet. See [docs/research.md](docs/research.md) for immutable source/address/ABI pins and RPC evidence, [docs/spec.md](docs/spec.md) for implementation decisions and phase acceptance criteria, and [docs/size.md](docs/size.md) for the build status.
+
+The initial target is Roles **2.1.1**, factory **1.1.0**, and canonical MultiSendCallOnly **1.4.1**. Their deployed runtimes were checked on Ethereum, Gnosis and Polygon. The real Ethereum inspection fixture uses faulty **2.1.0** and tests version warnings; fork write tests use fresh 2.1.1 proxies. A complete historical event scan has not been verified yet.
+
+The phase-0 Anvil experiment verified factory prediction, fresh proxy deployment and owner/avatar/target on a disposable fork. Re-run it with `FORK_URL=https://eth.drpc.org node scripts/rehearse-research.mjs` (requires the sibling safe checkout and Foundry Anvil).
+
+Reproduce the read-only Ethereum checks with Node 22 or later:
+
+```sh
+RPC_URL=https://eth.drpc.org CHAIN_ID=1 node scripts/verify-research.mjs
+```
+
+No npm installation is needed for phase 0. Public RPC history limits vary; use an archive endpoint if the command fails. These development RPCs are never part of the production app. The next phase is the copied safe.wei shell/build/dev wallet, after the phase 0 PR is merged. The private repository is `cazala/roles`.
+
 ---
 
 ## 1. Principles (inherited from safe.wei, non-negotiable)

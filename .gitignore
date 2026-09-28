@@ -1,0 +1,7 @@
+node_modules/
+dist/
+out/
+cache/
+.env
+deploy/local-*.json
+.DS_Store
