@@ -137,3 +137,9 @@ Use [safe.wei's pinned stable link contract](https://github.com/cazala/safe/blob
 Phase 1 starts UI/CSS verbatim and copies the small ABI/RPC/wallet/name helpers and build/dev/fork/deploy tooling. Replace app/storage/deployment-record names deliberately; do not copy private `.env`, cached deployments, wallet state or `node_modules`. Later phases copy hashing/sharing/batching helpers when used. Track modifications and imported dependencies per file; no shared package yet. safe.wei itself remains unchanged.
 
 Cross-origin storage cannot be reused automatically. Reuse the saved-Safe list design and schema; add explicit import if needed. No backend or hidden request to safe.wei is needed for links.
+
+## Phase 1 copy record
+
+Copied the sibling's current UI/CSS, ABI/keccak, ABI coder, labels/storage, wallet/RPC, chains/names/selectors and build/dev/fork/deploy patterns. UI and CSS started verbatim; UI/storage/name strings now use roles.wei. No WalletConnect client or fallback RPC is included. Build IDs hash source files deterministically; the resource guard rejects network loader primitives and remote assets while permitting ordinary gateway navigation links. The harness now lives locally and uses the working Ethereum archive default. The ERC-8244 contract is renamed RolesWeiApp with the same immutable chunk assembly. The user's DESIGN.md revision uses plain paragraphs for role explanations.
+
+The phase-1 copy was taken from safe.wei commit `80ba91f19e20950c9c0f0720c1e380d7f61eef3e` (newer than the phase-0 research baseline). Phase-1 validation: ABI encoding/canonical-decoding reference test passed; real typing in the Home and label inputs, wallet connection/continuation and returning Home verified with the Anvil browser wallet. The 49,254-byte page was deployed on the local fork and `html()` matched byte for byte. No mainnet deployment was performed.
