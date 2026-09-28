@@ -160,6 +160,9 @@ p.added { margin: 4px 0 0; padding: 0; background: none; font-size: 13px; }
 .batchbar { display: none; }
 @media (max-width: 700px) {
   #batch { display: none; }
+  #batch:not(:empty) { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(0, 0, 0, .25); }
+  #batch:not(:empty) button { width: 100%; }
+  body:has(#batch:not(:empty)) { padding-bottom: 76px; }
   body.hasbar { padding-bottom: 96px; }
   .batchbar { display: flex; align-items: flex-start; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(0, 0, 0, .25); }
   .batchbar details { flex: 1; min-width: 0; border: 0; margin: 0; }

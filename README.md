@@ -11,7 +11,7 @@ Read these before writing code:
 
 ## Current status
 
-Phases 0–7 are implemented: the wallet shell, module discovery, resumable permissions reader, condition explanations, live allowances, pending edits, safe.wei hand-offs, deterministic creation, simulated member execution and ABI-derived condition authoring. The final phase is polish, deployment rehearsal and handoff documentation.
+All implementation phases are complete: the wallet shell, module discovery, resumable permissions reader, condition explanations, live allowances, pending edits, safe.wei hand-offs, deterministic creation, simulated member execution, ABI-derived condition authoring, mobile states and deployment tooling. CI publishes `main` to [roles.caza.la](https://roles.caza.la). Mainnet deployment and pointing `roles.wei` remain owner actions; follow [the deployment handoff](docs/deploy.md).
 
 ```sh
 npm ci

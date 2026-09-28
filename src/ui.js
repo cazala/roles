@@ -241,6 +241,17 @@ export function labelDialog(a) {
 export const warn = (...t) => h('p.warn', ...t);
 export const bad = (...t) => h('p.bad', ...t);
 
+/** Turn common wallet/RPC failures into a useful next step. */
+export function friendlyError(e) {
+  if (e?.code === 4001) return 'Request cancelled in your wallet.';
+  const message = (e && (e.shortMessage || e.message)) || String(e);
+  if (/insufficient funds/i.test(message)) return 'This wallet does not have enough native currency for gas.';
+  if (/missing trie|historical state|archive node|state is not available/i.test(message)) return 'This wallet’s RPC cannot read the required chain history. Try another RPC or enter a later start block.';
+  if (/method not found|unsupported method|does not support/i.test(message)) return 'This wallet’s RPC does not support that request.';
+  if (/execution reverted|transaction reverted|reverted without/i.test(message)) return 'The contract rejected this request. Check the current permissions and values, then try again.';
+  return message;
+}
+
 /** Run an async action from a button: disables it and shows errors inline. */
 export function act(btn, fn, out) {
   return async () => {
@@ -249,8 +260,7 @@ export function act(btn, fn, out) {
     try {
       await fn();
     } catch (e) {
-      const m = (e && (e.shortMessage || e.message)) || String(e);
-      (out || btn.parentNode).append(bad(m));
+      (out || btn.parentNode).append(bad(friendlyError(e)));
     } finally {
       btn.disabled = false;
     }
