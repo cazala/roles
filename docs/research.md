@@ -147,3 +147,7 @@ The phase-1 copy was taken from safe.wei commit `80ba91f19e20950c9c0f0720c1e380d
 ## Phase 2 verification
 
 The event decoder uses the exact pinned inputs/indexing and rejects encodings that do not round-trip. Unit tests compare dynamic tuples and indexed events to viem, retain function state on target revocation, and exercise scan limits/resume/cancellation/reorg reset. A fresh 2.1.1 proxy on Anvil passed Safe-module discovery, deployment-block discovery and complete log replay against owner/avatar/target getters. Browser verification covered scan completion, role navigation and real typing in the history input. The scanner brackets recent deployment blocks before binary search to avoid requiring ancient state for newly deployed modules. Explicit start blocks remain partial/read-only.
+
+## Phase 3 verification
+
+Added lossless BFS tree conversion and words for the initial operators, with raw fallbacks. Allowance views use the getter's actual return order, block time, discrete refill, cap semantics and checked integer arithmetic. Boundary/overflow unit tests pass; the fork test consumes an allowance through member execution, advances one refill period and compares contract storage with the local accrual calculation. Browser inspection verified the weekly allowance and its parameter condition.

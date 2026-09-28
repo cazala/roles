@@ -11,7 +11,7 @@ Read these before writing code:
 
 ## Current status
 
-Phases 0–2 are implemented: the single-file wallet shell plus Safe module discovery, version/ownership warnings and resumable event replay into roles, members, targets and raw conditions. Condition explanations and editing follow in the remaining phases.
+Phases 0–3 are implemented: the wallet shell, module discovery, resumable permissions reader, condition explanations and live allowance balances. Editing, creation and execution follow in the remaining phases.
 
 ```sh
 npm ci
