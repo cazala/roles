@@ -11,7 +11,7 @@ Read these before writing code:
 
 ## Current status
 
-Phases 0–1 are implemented: pinned contract research, the safe.wei shell, browser-wallet connection, names, searchable saved addresses and a self-contained build. Permission inspection and editing follow in the remaining phases.
+Phases 0–2 are implemented: the single-file wallet shell plus Safe module discovery, version/ownership warnings and resumable event replay into roles, members, targets and raw conditions. Condition explanations and editing follow in the remaining phases.
 
 ```sh
 npm ci
