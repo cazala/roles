@@ -46,7 +46,7 @@ Light and dark follow `prefers-color-scheme`; nothing else is themed.
 - **Dialogs** (`sheet(icon, title)`): header with an icon in a circle, title, close ×; body padding 20px; bottom sheet on phones; backdrop blur. Used for Labels, Backup & sync, label editing.
 - **Cards and panels**: `.panel` (14px radius, 16–18px padding) for forms, `.step` (12px radius, 18px padding) for the "next step" card, `.opt` for side-by-side choices (two columns, stacked on phones).
 - **Chips** (`.chip`): pill, 1px border, 12px muted text; `.ok` / `.warn` / `.bad` variants. Use sparingly: facts that change what you do (chain differs, queued, payable).
-- **Notes**: `p.warn` (yellow background) for attention, `p.bad` (red background, bold) for danger, `p.danger` (2px red border, 16px) for "DANGEROUS: ..." banners, `p.onote` (bordered muted note) for role explanations like "This wallet isn't an owner…".
+- **Notes**: `p.warn` (yellow background) for attention, `p.bad` (red background, bold) for danger, `p.danger` (2px red border, 16px) for "DANGEROUS: ..." banners. Role explanations ("This wallet isn't an owner…") are a plain `p` inside the next-step card.
 - **Details**: `<details>` with a custom rotating chevron, a top border, and a medium-weight summary, for "Advanced" and "Transaction details".
 - **Hover actions**: `.acts` / `.racts` at `opacity: 0`, shown on row hover or focus-within, always shown on touch (`@media (hover: none)`).
 - **Empty states**: one centered muted sentence that says what will appear and how ("Safes you open will be listed here.").

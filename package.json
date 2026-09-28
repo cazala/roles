@@ -1,0 +1,17 @@
+{
+  "name": "roles-wei",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "fork": "node scripts/fork.mjs",
+    "test": "node --test test/unit/*.test.mjs",
+    "test:fork": "node --test --test-concurrency=1 test/fork/*.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "viem": "^2.56.9"
+  }
+}
