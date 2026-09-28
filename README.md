@@ -11,7 +11,7 @@ Read these before writing code:
 
 ## Current status
 
-Phases 0–4 are implemented: the wallet shell, module discovery, resumable permissions reader, condition explanations, live allowance balances, pending edits and verified safe.wei hand-offs. Creation and execution follow in the remaining phases.
+Phases 0–5 are implemented: the wallet shell, module discovery, resumable permissions reader, condition explanations, live allowance balances, pending edits, verified safe.wei hand-offs and deterministic modifier creation. Role execution follows in the remaining phases.
 
 ```sh
 npm ci
