@@ -57,7 +57,10 @@ export async function renderAddress(address, path, epoch) {
   const run = async () => {
     if (scanning) return; scanning = true; go.disabled = true; pause.disabled = false; controller = new AbortController(); put(out);
     try {
-      const result = await scan(request, { address, chain, block: Number(BigInt(snapshot.number)), signal: controller.signal, start: start.value.trim() ? start.value.trim() : undefined, progress: p => put(status, 'Scanned to block ' + p.last + ' of ' + p.block + ' · ' + p.events + ' events') });
+      // The scan saves its progress every few windows; keep going until it catches up or is paused.
+      let result;
+      do result = await scan(request, { address, chain, block: Number(BigInt(snapshot.number)), signal: controller.signal, start: start.value.trim() ? start.value.trim() : undefined, progress: p => put(status, 'Scanned to block ' + p.last + ' of ' + p.block + ' · ' + p.events + ' events') });
+      while (!result.caughtUp && !controller.signal.aborted);
       const state = replay(result.logs);
       if (result.caughtUp && result.hash !== snapshot.hash) throw Error('Snapshot changed during scan. Refresh the page.');
       if (result.complete && ['owner', 'avatar', 'target'].some(k => state[k] !== meta[k])) throw Error('History does not match current contract metadata. Reset and rescan before editing.');
