@@ -54,7 +54,7 @@ export async function renderAddress(address, path, epoch) {
   root.append(tabbar(address, path[0] === 'allowances' ? 'allowances' : 'roles'));
   const status = h('p.mut', 'Preparing history scan…'), content = h('div'), out = h('div');
   // While a scan runs block by block, point to the fast path, inline: an Etherscan key loads it in a few requests.
-  const tip = () => !explorerKey() && !request.wide && [' · ', h('a.hint', { href: '#', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Add an Etherscan API key'), ' to load instantly instead of scanning block by block.'];
+  const tip = () => !explorerKey() && !request.wide && [' · ', h('a.hint', { href: '#', title: 'An Etherscan API key loads the history in a few requests instead of scanning block by block', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Add an Etherscan key'), ' to load instantly'];
   const start = h('input', { 'aria-label': 'History start block', placeholder: 'Auto-detect deployment block', inputmode: 'numeric' });
   const go = h('button', 'Scan / resume'), pause = h('button', 'Pause');
   let controller, scanning = false;
@@ -67,7 +67,7 @@ export async function renderAddress(address, path, epoch) {
       if (!t0) (t0 = now), (b0 = p.last);
       const pct = p.block > p.start ? Math.floor((100 * (p.last - p.start + 1)) / (p.block - p.start + 1)) : 100;
       const rate = (p.last - b0) / (now - t0), left = rate > 0 ? (p.block - p.last) / rate : 0;
-      const eta = now - t0 < 3000 || !(rate > 0) ? '' : left < 60000 ? ' · less than a minute left' : left < 3600000 ? ' · about ' + Math.round(left / 60000) + ' min left' : ' · about ' + Math.round(left / 3600000) + ' h left';
+      const eta = now - t0 < 3000 || !(rate > 0) ? '' : left < 60000 ? ' · < 1 min left' : left < 3600000 ? ' · ~' + Math.round(left / 60000) + ' min left' : ' · ~' + Math.round(left / 3600000) + ' h left';
       put(status, 'Scanning history · ' + pct + '% · ' + p.events + ' event' + (p.events === 1 ? '' : 's') + eta, p.last < p.block && tip());
     };
     put(status, 'Finding where this modifier’s history starts…', tip());
