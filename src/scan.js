@@ -1,6 +1,6 @@
 import { load, store } from './store.js';
 import { quantity, decodeEvent, SETUP_TOPIC } from './roles.js';
-import { noHistory } from './history.js';
+import { noHistory } from './reads.js';
 const cancelled = signal => { if (signal?.aborted) throw Error('Scan paused. Resume to continue.'); };
 // Most wallet RPCs are full nodes, not archives: past state (eth_getCode at an old block) is gone, logs are not.
 const tooWide = e => /range|limit|size|result|response|too many|too large/i.test(e?.message || '');

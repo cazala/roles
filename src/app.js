@@ -5,7 +5,7 @@ import { use, rpc } from './rpc.js';
 import { add, discover, list, remembered, remember } from './wallets.js';
 import { connector, provider as wcProvider } from './wc.js';
 import { qr, qrPath } from './qr.js';
-import { WC_RPC } from './history.js';
+import { addRpc, explorerKey, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } from './reads.js';
 import { resolveName } from './names.js';
 import { load, store } from './store.js';
 import * as labels from './labels.js';
@@ -61,7 +61,8 @@ async function connected(wallet) {
   const accounts = await provider.request({ method: 'eth_requestAccounts' });
   if (!accounts?.[0]) throw Error('No account was connected.');
   if (session.provider?.removeListener) for (const event of ['accountsChanged', 'chainChanged']) session.provider.removeListener(event, changed);
-  session.provider = provider; use(provider);
+  // The wallet signs; reads go through the reader (Settings: your RPCs, Etherscan; fallbacks).
+  session.provider = reader(provider, { chain: () => session.chain, projectId: WC_ID }); use(session.provider);
   session.account = accounts[0].toLowerCase();
   session.chain = Number(await rpc('eth_chainId')); session.epoch++;
   remember(wallet.key);
@@ -93,10 +94,10 @@ function walletDialog() {
   const { body, close } = sheet('people', session.account ? 'Your wallet' : 'Connect a wallet');
   const out = h('div');
   const option = (title, sub, fn) => { const b = h('button.wopt', h('span.wtext', h('b', title), sub && h('span.mut', sub)), icon(...ICONS.next)); b.onclick = act(b, fn, out); return b; };
-  const wallets = list().filter((w) => !session.account || w.provider !== session.provider);
+  const wallets = list().filter((w) => !session.account || w.provider !== session.provider?.wallet);
   const choices = wallets.map((w) => option(w.name, w.key === 'walletconnect' ? 'A wallet on your phone, by QR code' : 'Browser wallet', async () => { await connected(w); close(); }));
   if (!session.account) return put(body, h('p.mut', 'roles.wei reads the chain and asks for signatures through the wallet you connect.'), h('div.wlist', choices), out);
-  const wc = session.provider === ownerWallet, chains = wc ? (ownerConn.session()?.chains || []).filter((c) => c !== session.chain) : [];
+  const wc = session.provider?.wallet === ownerWallet, chains = wc ? (ownerConn.session()?.chains || []).filter((c) => c !== session.chain) : [];
   put(
     body,
     h('div.wacct', h('span.mut.small', (wc ? peerName() + ' · ' : '') + network(session.chain)), addr(session.account)),
@@ -107,6 +108,35 @@ function walletDialog() {
   );
 }
 $('connect').onclick = walletDialog;
+
+/** Settings: RPC endpoints (reads go there instead of the wallet, per chain) and an Etherscan API key. */
+function settingsDialog() {
+  const { body } = sheet('gear', 'Settings');
+  const out = h('div'), list = h('div'), host = (u) => { try { return new URL(u).host; } catch { return u; } };
+  const draw = () => {
+    const m = Object.entries(rpcs());
+    put(list, m.length ? h('div.slist', m.map(([c, u]) => h('div.srow', h('b', network(Number(c))), h('code.sa', host(u)), h('span.grow'), h('button.link', { onclick: () => (removeRpc(c), draw(), route()) }, 'Remove')))) : h('p.mut.small', 'None: reads go through your wallet.'));
+  };
+  const url = h('input', { placeholder: 'https://… (Alchemy, Infura, your node)', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'RPC URL' }), add = h('button', 'Add');
+  add.onclick = act(add, async () => { const c = await addRpc(url.value); url.value = ''; draw(); put(out, h('p.ok', 'Added for ' + network(c) + '.')); route(); }, out);
+  const key = h('input', { value: explorerKey(), placeholder: 'Etherscan API key', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Etherscan API key' }), saveKey = h('button', 'Save');
+  saveKey.onclick = act(saveKey, async () => { setExplorerKey(key.value); put(out, h('p.ok', key.value.trim() ? 'Etherscan key saved.' : 'Etherscan key removed.')); route(); }, out);
+  draw();
+  put(
+    body,
+    h('p.wsec', 'RPC endpoints'),
+    h('p.mut.small', 'roles.wei reads through your wallet. Add an RPC endpoint and every read on its chain goes there instead: faster, and it works where your wallet’s RPC dropped old history. The chain is detected from the endpoint. Signing always stays in your wallet.'),
+    list,
+    h('div.row', url, add),
+    h('p.wsec', 'Etherscan API key (optional, faster history)'),
+    h('p.mut.small', 'With a key, a Roles modifier’s history comes from Etherscan’s index in a few requests instead of block by block. roles.wei still checks every event and the block it is in, but trusts Etherscan to return all of them: a missing event would hide a permission. One key covers every chain Etherscan indexes. Leave it empty to read only from the chain.'),
+    h('div.row', key, saveKey),
+    h('p.mut.small', 'Kept in this browser (localStorage).'),
+    out,
+  );
+}
+$('settings').append(icon(...ICONS.gear));
+$('settings').onclick = settingsDialog;
 setResolver(v => resolveName(v, session.chain));
 export async function resolve(v) {
   return isAddr(v) ? v.toLowerCase() : resolveName(v.trim().toLowerCase(), session.chain);
@@ -135,7 +165,7 @@ export async function route() {
   if (!session.account) { put(main, h('div.home.gate', h('div.panel.gatecard', h('span.mark', icon(...ICONS.people)), h('h2', 'Connect a wallet to open this address'), h('p', 'Chain reads use your wallet’s RPC.'), h('button.primary', { onclick: () => requireWallet(route) }, 'Connect a wallet')))); return; }
   try {
     const requested = new URLSearchParams(location.hash.split('?')[1] || '').get('chain');
-    if (requested && Number(requested) !== session.chain) { put(main, h('div.panel', h('h2', 'Switch to ' + network(Number(requested))), h('button.primary', { onclick: () => requireWallet(async () => { try { await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + Number(requested).toString(16) }]); await changed(); } catch (e) { main.append(bad(e.code === 4902 ? (session.provider === ownerWallet ? peerName() + ' did not approve ' + network(Number(requested)) + ' when it connected. Disconnect, then connect again and approve it.' : 'Add this chain in your wallet, then try again.') : friendlyError(e))); } }) }, 'Switch chain'))); return; }
+    if (requested && Number(requested) !== session.chain) { put(main, h('div.panel', h('h2', 'Switch to ' + network(Number(requested))), h('button.primary', { onclick: () => requireWallet(async () => { try { await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + Number(requested).toString(16) }]); await changed(); } catch (e) { main.append(bad(e.code === 4902 ? (session.provider?.wallet === ownerWallet ? peerName() + ' did not approve ' + network(Number(requested)) + ' when it connected. Disconnect, then connect again and approve it.' : 'Add this chain in your wallet, then try again.') : friendlyError(e))); } }) }, 'Switch chain'))); return; }
     const address = await resolve(path[0]);
     put(main, h('p.mut', 'Reading the chain…'));
     const view = await renderAddress(address, path.slice(1), epoch);
