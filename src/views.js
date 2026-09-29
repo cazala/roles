@@ -7,7 +7,7 @@ import { h, put, addr, bad, warn, act, short } from './ui.js';
 import { session, route } from './app.js';
 import { identify, metadata, safeModules, replay, keyName, json, quantity } from './roles.js';
 import { scan, clearScan } from './scan.js';
-import { historyRequest, ownRpc, setOwnRpc } from './history.js';
+import { explorerKey, historyRequest, ownRpc, setExplorerKey, setOwnRpc } from './history.js';
 
 export const hooks = { conditions: conditionView, allowances: allowanceView, body: editBody, create: createView };
 editorHooks.use = useRole;
@@ -54,6 +54,7 @@ export async function renderAddress(address, path, epoch) {
   const status = h('p.mut', 'Preparing history scan…'), content = h('div'), out = h('div');
   const start = h('input', { 'aria-label': 'History start block', placeholder: 'Auto-detect deployment block', inputmode: 'numeric' });
   const rpcIn = h('input', { 'aria-label': 'History RPC', placeholder: 'https://… (optional)', value: ownRpc(), spellcheck: 'false', autocomplete: 'off' });
+  const keyIn = h('input', { 'aria-label': 'Etherscan API key', placeholder: 'Etherscan API key (optional)', value: explorerKey(), spellcheck: 'false', autocomplete: 'off' });
   let source = null;
   // Logs and past blocks: the wallet's RPC when it keeps them, else yours (History options), else WalletConnect's.
   const history = () => ((source = null), historyRequest(request, { chain, projectId: typeof WC_PROJECT === 'string' ? WC_PROJECT : '', used: (label) => (source = label) }));
@@ -77,7 +78,9 @@ export async function renderAddress(address, path, epoch) {
     finally { scanning = false; go.disabled = false; pause.disabled = true; }
   };
   pause.onclick = () => controller?.abort(); go.onclick = run;
-  root.append(status, h('div.actions', go, pause, h('button.link', { onclick: () => { controller?.abort(); clearScan(chain, address); put(content); put(status, 'Cache cleared. Scan again.'); } }, 'Reset cache')), h('details', h('summary', 'History options'), h('label', 'Start block (leave empty for complete history)'), start, h('label', 'History RPC (optional: used for the scan instead of your wallet’s)'), h('div.row', rpcIn, h('button', { onclick: () => { try { setOwnRpc(rpcIn.value); controller?.abort(); clearScan(chain, address); put(out); run(); } catch (e) { put(out, bad(e.message)); } } }, 'Save and rescan'))), out, content);
+  root.append(status, h('div.actions', go, pause, h('button.link', { onclick: () => { controller?.abort(); clearScan(chain, address); put(content); put(status, 'Cache cleared. Scan again.'); } }, 'Reset cache')), h('details', h('summary', 'History options'), h('label', 'Start block (leave empty for complete history)'), start, h('label', 'History RPC (optional: used for the scan instead of your wallet’s)'), h('div.row', rpcIn, h('button', { onclick: () => { try { setOwnRpc(rpcIn.value); controller?.abort(); clearScan(chain, address); put(out); run(); } catch (e) { put(out, bad(e.message)); } } }, 'Save and rescan')),
+      h('label', 'Faster history with an Etherscan API key (optional)'), h('div.row', keyIn, h('button', { onclick: () => { try { setExplorerKey(keyIn.value); controller?.abort(); clearScan(chain, address); put(out); run(); } catch (e) { put(out, bad(e.message)); } } }, 'Save and rescan')),
+      h('p.fhint', 'The history comes from Etherscan’s index in a few requests instead of block by block. roles.wei still checks every event and each block it is in, but trusts Etherscan to return all of them: a missing event would hide a permission. The key stays in this browser. Leave it empty to read only from the chain.')), out, content);
   run();
   return root;
 }
