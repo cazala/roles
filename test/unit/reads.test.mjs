@@ -94,3 +94,20 @@ test('an RPC error inside an HTTP error keeps its message (so a too-wide log ran
   await assert.rejects(jsonRpc('https://x.example', 'eth_chainId'), /answered 502/);
   globalThis.fetch = saved;
 });
+
+test('your RPC capping log ranges: those ranges go to WalletConnect’s RPC, everything else stays on yours', async () => {
+  reset();
+  await addRpc('https://capped.example/v2/key');
+  const saved = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const { id, method } = JSON.parse(init.body);
+    served.push([url, method]);
+    if (url.startsWith('https://capped.example') && method === 'eth_getLogs') return { ok: false, status: 400, json: async () => ({ jsonrpc: '2.0', id, error: { code: -32600, message: 'Under the Free tier plan, you can make eth_getLogs requests with up to a 10 block range.' } }) };
+    return { ok: true, json: async () => ({ jsonrpc: '2.0', id, result: method === 'eth_chainId' ? '0x1' : 'from ' + url }) };
+  };
+  const r = reader(wallet(), { chain: () => 1, projectId: 'p' });
+  assert.equal(await r.request({ method: 'eth_getLogs', params: [{}] }), 'from ' + WC_RPC(1, 'p'));
+  assert.match(r.source, /limits log ranges/);
+  assert.equal(await r.request({ method: 'eth_call', params: [{}] }), 'from https://capped.example/v2/key');
+  globalThis.fetch = saved;
+});

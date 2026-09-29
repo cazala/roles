@@ -8,6 +8,7 @@ const HISTORY = ['eth_getLogs', 'eth_getCode', 'eth_getBlockByNumber'];
 // Read-only methods an RPC can answer instead of the wallet; everything else (accounts, signing, chain switching) stays with it.
 const READS = new Set([...HISTORY, 'eth_call', 'eth_blockNumber', 'eth_getBalance', 'eth_getStorageAt', 'eth_getBlockByHash', 'eth_getTransactionReceipt', 'eth_getTransactionByHash', 'eth_getTransactionCount', 'eth_estimateGas', 'eth_gasPrice', 'eth_feeHistory', 'eth_maxPriorityFeePerGas']);
 export const noHistory = (e) => /historical state|missing trie|archive|state is not available|state not available|pruned|history unavailable/i.test((e && e.message) || '');
+export const tooWide = (e) => /range|limit|size|result|response|too many|too large/i.test((e && e.message) || '');
 export const WC_RPC = (chain, projectId) => 'https://rpc.walletconnect.org/v1/?chainId=eip155:' + chain + '&projectId=' + projectId;
 
 /** RPC endpoints the user added, per chain: { chainId: url } (kept in this browser). */
@@ -78,7 +79,16 @@ export function reader(wallet, { chain, projectId }) {
       if (method === 'eth_getLogs' && explorerKey()) return explorer(c, params);
       if (!READS.has(method)) return wallet.request({ method, params });
       const own = rpcFor(c);
-      if (own) return note(method, 'your RPC'), jsonRpc(own, method, params);
+      if (own) {
+        try {
+          const v = await jsonRpc(own, method, params);
+          return note(method, 'your RPC'), v;
+        } catch (e) {
+          // Many plans cap log ranges (Alchemy's free tier: 10 blocks); a scan through them would take forever.
+          if (method !== 'eth_getLogs' || !tooWide(e) || !projectId) throw e;
+          return note(method, 'WalletConnect’s RPC (your RPC limits log ranges)'), jsonRpc(WC_RPC(c, projectId), method, params);
+        }
+      }
       if (fallback.has(c) && HISTORY.includes(method)) return note(method, 'WalletConnect’s RPC'), jsonRpc(WC_RPC(c, projectId), method, params);
       try {
         const v = await wallet.request({ method, params });
