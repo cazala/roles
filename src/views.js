@@ -7,6 +7,7 @@ import { h, put, addr, bad, warn, act, short } from './ui.js';
 import { session, route } from './app.js';
 import { identify, metadata, safeModules, replay, keyName, json, quantity } from './roles.js';
 import { scan, clearScan } from './scan.js';
+import { historyRequest, ownRpc, setOwnRpc } from './history.js';
 
 export const hooks = { conditions: conditionView, allowances: allowanceView, body: editBody, create: createView };
 editorHooks.use = useRole;
@@ -52,6 +53,10 @@ export async function renderAddress(address, path, epoch) {
   root.append(tabbar(address, path[0] === 'allowances' ? 'allowances' : 'roles'));
   const status = h('p.mut', 'Preparing history scan…'), content = h('div'), out = h('div');
   const start = h('input', { 'aria-label': 'History start block', placeholder: 'Auto-detect deployment block', inputmode: 'numeric' });
+  const rpcIn = h('input', { 'aria-label': 'History RPC', placeholder: 'https://… (optional)', value: ownRpc(), spellcheck: 'false', autocomplete: 'off' });
+  let source = null;
+  // Logs and past blocks: the wallet's RPC when it keeps them, else yours (History options), else WalletConnect's.
+  const history = () => ((source = null), historyRequest(request, { chain, projectId: typeof WC_PROJECT === 'string' ? WC_PROJECT : '', used: (label) => (source = label) }));
   const go = h('button', 'Scan / resume'), pause = h('button', 'Pause');
   let controller, scanning = false;
   const run = async () => {
@@ -59,19 +64,20 @@ export async function renderAddress(address, path, epoch) {
     try {
       // The scan saves its progress every few windows; keep going until it catches up or is paused.
       let result;
-      do result = await scan(request, { address, chain, block: Number(BigInt(snapshot.number)), signal: controller.signal, start: start.value.trim() ? start.value.trim() : undefined, progress: p => put(status, 'Scanned to block ' + p.last + ' of ' + p.block + ' · ' + p.events + ' events') });
+      const read = history();
+      do result = await scan(read, { address, chain, block: Number(BigInt(snapshot.number)), signal: controller.signal, start: start.value.trim() ? start.value.trim() : undefined, progress: p => put(status, 'Scanned to block ' + p.last + ' of ' + p.block + ' · ' + p.events + ' events') });
       while (!result.caughtUp && !controller.signal.aborted);
       const state = replay(result.logs);
       if (result.caughtUp && result.hash !== snapshot.hash) throw Error('Snapshot changed during scan. Refresh the page.');
       if (result.complete && ['owner', 'avatar', 'target'].some(k => state[k] !== meta[k])) throw Error('History does not match current contract metadata. Reset and rescan before editing.');
       const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, ownerSafe, refresh: route };
-      put(status, (result.complete ? 'Complete history' : result.caughtUp ? 'Partial history — editing disabled' : 'Paused — resume scanning') + ' · blocks ' + result.start + '–' + result.last);
+      put(status, (result.complete ? 'Complete history' : result.caughtUp ? 'Partial history — editing disabled' : 'Paused — resume scanning') + ' · blocks ' + result.start + '–' + result.last + (source ? ' · read through ' + source : ''));
       put(content, body(ctx, path));
-    } catch (e) { if (epoch === session.epoch) put(out, warn(e.message + ' If historical reads are unavailable, enter a start block. A partial scan stays read-only.')); }
+    } catch (e) { if (epoch === session.epoch) put(out, warn(e.message + ' If an RPC cannot serve this history, set a History RPC (or a start block) in History options.')); }
     finally { scanning = false; go.disabled = false; pause.disabled = true; }
   };
   pause.onclick = () => controller?.abort(); go.onclick = run;
-  root.append(status, h('div.actions', go, pause, h('button.link', { onclick: () => { controller?.abort(); clearScan(chain, address); put(content); put(status, 'Cache cleared. Scan again.'); } }, 'Reset cache')), h('details', h('summary', 'History options'), h('label', 'Start block (leave empty for complete history)'), start), out, content);
+  root.append(status, h('div.actions', go, pause, h('button.link', { onclick: () => { controller?.abort(); clearScan(chain, address); put(content); put(status, 'Cache cleared. Scan again.'); } }, 'Reset cache')), h('details', h('summary', 'History options'), h('label', 'Start block (leave empty for complete history)'), start, h('label', 'History RPC (optional: used for the scan instead of your wallet’s)'), h('div.row', rpcIn, h('button', { onclick: () => { try { setOwnRpc(rpcIn.value); controller?.abort(); clearScan(chain, address); put(out); run(); } catch (e) { put(out, bad(e.message)); } } }, 'Save and rescan'))), out, content);
   run();
   return root;
 }

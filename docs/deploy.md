@@ -46,6 +46,10 @@ npm run deployer -- --anvil http://127.0.0.1:18600
 6. The reported owner sends the printed `setAddr(uint256,address)` transaction. Re-run the helper until it says both that `html()` matches and `roles.wei` already points at the app. Open `https://roles.wei.limo/` and perform a final read and a small end-to-end action.
 7. Commit `deploy/1.json`, record the app, content hash, code hash and gas in the README, and tag that deployed commit (for example `deployed-1`).
 
+## WalletConnect project ID
+
+The project ID (`config/walletconnect.json`) is built into its own tiny first chunk, cut at the `<!--config-->` marker, as in safe.wei. Replacing it changes only that chunk and the app contract; the other chunks keep their addresses, provided the rest is built from the deployed `src/` (tag the deployed commit). The steps are safe.wei's: `docs/deploy.md` → Replacing the WalletConnect project ID. The project must allow `roles.caza.la`, `*.roles-wei.pages.dev` and the gateway domains.
+
 ## Cloudflare Pages
 
 The same `dist/index.html` is published by CI to the `roles-wei` Pages project. Pull requests receive a branch preview; pushes to `main` update `roles.caza.la`. The workflow adds anti-framing, MIME-sniffing and referrer headers. Repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` authorize Pages, while `ALCHEMY_API_KEY` gives fork tests an archive RPC.

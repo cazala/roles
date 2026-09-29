@@ -1,0 +1,457 @@
+import { jsonRpc, socket } from './net.js';
+
+// WalletConnect v2 (Sign protocol), dapp side, minimal: roles.wei shows a QR code, a wallet elsewhere (a phone)
+// approves, and signing requests go to it. Adapted from safe.wei's src/wc.js. Everything between the wallet and roles.wei is end-to-end
+// encrypted (X25519 + HKDF-SHA256 keys, ChaCha20-Poly1305); the relay only moves ciphertext.
+// Constants follow the WalletConnect specs and the official SDK (tags, TTLs, envelope types).
+// Crypto: WebCrypto for SHA-256, HKDF, X25519 and Ed25519; ChaCha20-Poly1305 (RFC 8439) below.
+
+const RELAY = 'wss://relay.walletconnect.org';
+const MIN5 = 300, DAY = 86400;
+export const TAGS = {
+  proposeRes: 1101, proposeReject: 1120, settle: 1102, settleRes: 1103, update: 1104, extend: 1106,
+  request: 1108, requestRes: 1109, event: 1110, del: 1112, delRes: 1113, ping: 1114, pingRes: 1115,
+};
+
+// ---- ChaCha20-Poly1305 (RFC 8439) ----
+const rotl = (v, c) => ((v << c) | (v >>> (32 - c))) >>> 0;
+const words = (b) => Array.from({ length: b.length / 4 }, (_, i) => (b[4 * i] | (b[4 * i + 1] << 8) | (b[4 * i + 2] << 16) | (b[4 * i + 3] << 24)) >>> 0);
+
+function block(key, counter, nonce) {
+  const s = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574, ...words(key), counter >>> 0, ...words(nonce)], x = s.slice();
+  const qr = (a, b, c, d) => {
+    x[a] = (x[a] + x[b]) >>> 0; x[d] = rotl(x[d] ^ x[a], 16);
+    x[c] = (x[c] + x[d]) >>> 0; x[b] = rotl(x[b] ^ x[c], 12);
+    x[a] = (x[a] + x[b]) >>> 0; x[d] = rotl(x[d] ^ x[a], 8);
+    x[c] = (x[c] + x[d]) >>> 0; x[b] = rotl(x[b] ^ x[c], 7);
+  };
+  for (let i = 0; i < 10; i++) {
+    qr(0, 4, 8, 12); qr(1, 5, 9, 13); qr(2, 6, 10, 14); qr(3, 7, 11, 15);
+    qr(0, 5, 10, 15); qr(1, 6, 11, 12); qr(2, 7, 8, 13); qr(3, 4, 9, 14);
+  }
+  const out = new Uint8Array(64);
+  for (let i = 0; i < 16; i++) {
+    const v = (x[i] + s[i]) >>> 0;
+    out[4 * i] = v & 255; out[4 * i + 1] = (v >>> 8) & 255; out[4 * i + 2] = (v >>> 16) & 255; out[4 * i + 3] = v >>> 24;
+  }
+  return out;
+}
+export function chacha20(key, counter, nonce, data) {
+  const out = new Uint8Array(data.length);
+  for (let p = 0; p < data.length; p += 64, counter++) {
+    const ks = block(key, counter, nonce);
+    for (let i = 0; i < 64 && p + i < data.length; i++) out[p + i] = data[p + i] ^ ks[i];
+  }
+  return out;
+}
+const le = (b) => b.reduceRight((n, x) => (n << 8n) | BigInt(x), 0n);
+export function poly1305(key, msg) {
+  const r = le(key.subarray(0, 16)) & 0x0ffffffc0ffffffc0ffffffc0fffffffn, s = le(key.subarray(16, 32)), P = (1n << 130n) - 5n;
+  let acc = 0n;
+  for (let i = 0; i < msg.length; i += 16) {
+    const chunk = msg.subarray(i, i + 16);
+    acc = ((acc + le(chunk) + (1n << BigInt(8 * chunk.length))) * r) % P;
+  }
+  acc = (acc + s) & ((1n << 128n) - 1n);
+  return Uint8Array.from({ length: 16 }, (_, i) => Number((acc >> BigInt(8 * i)) & 255n));
+}
+function mac(key, nonce, aad, ct) {
+  const otk = block(key, 0, nonce).subarray(0, 32), pad = (n) => (16 - (n % 16)) % 16;
+  const m = new Uint8Array(aad.length + pad(aad.length) + ct.length + pad(ct.length) + 16);
+  m.set(aad, 0);
+  m.set(ct, aad.length + pad(aad.length));
+  const lens = new DataView(m.buffer, m.length - 16);
+  lens.setBigUint64(0, BigInt(aad.length), true);
+  lens.setBigUint64(8, BigInt(ct.length), true);
+  return poly1305(otk, m);
+}
+export function seal(key, nonce, plaintext, aad = new Uint8Array(0)) {
+  const ct = chacha20(key, 1, nonce, plaintext), out = new Uint8Array(ct.length + 16);
+  out.set(ct);
+  out.set(mac(key, nonce, aad, ct), ct.length);
+  return out;
+}
+export function open(key, nonce, sealed, aad = new Uint8Array(0)) {
+  if (sealed.length < 16) return null;
+  const ct = sealed.subarray(0, sealed.length - 16), tag = sealed.subarray(sealed.length - 16), want = mac(key, nonce, aad, ct);
+  let diff = 0;
+  for (let i = 0; i < 16; i++) diff |= want[i] ^ tag[i];
+  return diff ? null : chacha20(key, 1, nonce, ct);
+}
+
+// ---- encodings ----
+export const hex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+export const unhex = (h) => Uint8Array.from(h.match(/../g) || [], (x) => parseInt(x, 16));
+const b64 = (b) => btoa(Array.from(b, (x) => String.fromCharCode(x)).join(''));
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const b64u = (b) => b64(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const utf8 = (s) => new TextEncoder().encode(s);
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+export function base58(b) {
+  let n = le([...b].reverse()), s = '';
+  while (n > 0n) (s = B58[Number(n % 58n)] + s), (n /= 58n);
+  for (const x of b) {
+    if (x) break;
+    s = '1' + s;
+  }
+  return s;
+}
+/** did:key of an Ed25519 public key (multicodec 0xed01, base58btc). */
+export const didKey = (pub) => 'did:key:z' + base58(Uint8Array.from([0xed, 0x01, ...pub]));
+const random = (n) => crypto.getRandomValues(new Uint8Array(n));
+const sha256 = async (b) => new Uint8Array(await crypto.subtle.digest('SHA-256', b));
+export const topicOf = async (key) => hex(await sha256(key));
+
+/** Envelope: type 0 = 0x00 ‖ iv(12) ‖ sealed; type 1 = 0x01 ‖ senderPublicKey(32) ‖ iv ‖ sealed. Base64. */
+export function encrypt(key, payload) {
+  const iv = random(12), sealed = seal(key, iv, utf8(JSON.stringify(payload))), out = new Uint8Array(13 + sealed.length);
+  out.set(iv, 1);
+  out.set(sealed, 13);
+  return b64(out);
+}
+export function decrypt(key, message) {
+  let b;
+  try {
+    b = unb64(message);
+  } catch {
+    return null;
+  }
+  const head = b[0] === 0 ? 1 : b[0] === 1 ? 33 : -1;
+  if (head < 0 || b.length < head + 28) return null;
+  const pt = open(key, b.subarray(head, head + 12), b.subarray(head + 12));
+  if (!pt) return null;
+  try {
+    return JSON.parse(new TextDecoder().decode(pt));
+  } catch {
+    return null;
+  }
+}
+
+const cryptoMissing = () => Error('This browser cannot do the cryptography WalletConnect needs (Ed25519 / X25519). Update it, or use another browser.');
+
+/**
+ * The relay client identity: an Ed25519 key kept across reloads. The relay ties a topic to the client
+ * that joined it, so a fresh key after a reload could listen to a session but not publish to it.
+ * Returns { pkcs8, pub } (hex); it only authenticates to the relay and controls no funds.
+ */
+async function newClientKey() {
+  try {
+    const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign']);
+    return { pkcs8: hex(new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey))), pub: hex(new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey))) };
+  } catch {
+    throw cryptoMissing();
+  }
+}
+/** Relay auth: a JWT signed by the client key (iss = its did:key, aud = the relay). */
+async function relayAuth(client) {
+  const key = await crypto.subtle.importKey('pkcs8', unhex(client.pkcs8), { name: 'Ed25519' }, false, ['sign']), iat = Math.floor(Date.now() / 1000);
+  const part = (o) => b64u(utf8(JSON.stringify(o)));
+  const body = part({ alg: 'EdDSA', typ: 'JWT' }) + '.' + part({ iss: didKey(unhex(client.pub)), sub: hex(random(32)), aud: RELAY, iat, exp: iat + DAY, act: 'client_auth' });
+  return body + '.' + b64u(new Uint8Array(await crypto.subtle.sign({ name: 'Ed25519' }, key, utf8(body))));
+}
+
+/** X25519 key pair (raw public key) and the shared session key with a peer: HKDF-SHA256(X25519). */
+async function keyPair() {
+  try {
+    const kp = await crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveBits']);
+    return { privateKey: kp.privateKey, pub: new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey)) };
+  } catch {
+    throw cryptoMissing();
+  }
+}
+export async function sharedKey(privateKey, peerHex) {
+  const peer = await crypto.subtle.importKey('raw', unhex(peerHex), { name: 'X25519' }, false, []);
+  const secret = await crypto.subtle.deriveBits({ name: 'X25519', public: peer }, privateKey, 256);
+  const ikm = await crypto.subtle.importKey('raw', secret, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new Uint8Array(0) }, ikm, 256));
+}
+
+// ---- the relay connection (shared by both roles) ----
+
+/**
+ * One WebSocket to the relay, authenticated with the persisted client key. `live()` says whether to
+ * reconnect after a drop (with back-off); every subscribed topic is re-subscribed on reconnect.
+ */
+function relay({ projectId, client, emit, live }) {
+  let sock = null, opening = null, nextId = 1, retry = 0;
+  const waiting = new Map(), subs = new Map(); // relay request id → {res, rej}; topic → handler
+  const id = () => Date.now() * 1000 + (nextId++ % 1000);
+
+  function onMessage(raw) {
+    let m;
+    try {
+      m = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (m.method === 'irn_subscription') {
+      send({ id: m.id, jsonrpc: '2.0', result: true });
+      const d = m.params && m.params.data, f = d && subs.get(d.topic);
+      if (f) Promise.resolve(f(d.message)).catch((e) => emit({ type: 'error', message: e.message }));
+      return;
+    }
+    const w = waiting.get(m.id);
+    if (w) waiting.delete(m.id), m.error ? w.rej(Error(m.error.message || 'Relay error')) : w.res(m.result);
+  }
+  const send = (o) => !!(sock && sock.readyState === 1 && (sock.send(JSON.stringify(o)), true));
+
+  async function connect() {
+    if (sock && sock.readyState === 1) return;
+    if (opening) return opening;
+    opening = (async () => {
+      const ws = socket(RELAY + '/?auth=' + (await relayAuth(await client())) + '&projectId=' + projectId() + '&ua=' + encodeURIComponent('wc-2/js/roles.wei'));
+      await new Promise((res, rej) => {
+        const t = setTimeout(() => rej(Error('The WalletConnect relay did not answer.')), 15000);
+        ws.onopen = () => (clearTimeout(t), res());
+        ws.onerror = () => (clearTimeout(t), rej(Error('The WalletConnect relay could not be reached.')));
+        ws.onclose = (e) => (clearTimeout(t), rej(Error('The WalletConnect relay refused the connection' + (e.code === 3000 || e.code === 4010 ? ': the project ID was not accepted.' : e.code ? ' (' + e.code + (e.reason ? ': ' + e.reason : '') + ').' : '.'))));
+      });
+      sock = ws;
+      retry = 0;
+      ws.onmessage = (e) => typeof e.data === 'string' && onMessage(e.data);
+      ws.onclose = () => {
+        sock = null;
+        for (const w of waiting.values()) w.rej(Error('The WalletConnect relay connection dropped.'));
+        waiting.clear();
+        if (live()) setTimeout(() => connect().catch(() => {}), Math.min(30000, 1000 * 2 ** retry++));
+        else emit({ type: 'closed' });
+      };
+      // Topics survive reconnects.
+      await Promise.all([...subs.keys()].map((topic) => call('irn_subscribe', { topic })));
+    })().finally(() => (opening = null));
+    return opening;
+  }
+  function call(method, params) {
+    const rid = id();
+    return new Promise((res, rej) => {
+      waiting.set(rid, { res, rej });
+      if (!send({ id: rid, jsonrpc: '2.0', method, params })) waiting.delete(rid), rej(Error('Not connected to the WalletConnect relay.'));
+      setTimeout(() => waiting.has(rid) && (waiting.delete(rid), rej(Error('The WalletConnect relay timed out.'))), 15000);
+    });
+  }
+  return {
+    id,
+    connect,
+    listen: (topic, fn) => subs.set(topic, fn),
+    subscribe: async (topic, fn) => (subs.set(topic, fn), await connect(), call('irn_subscribe', { topic })),
+    unsubscribe: (topic) => (subs.delete(topic), call('irn_unsubscribe', { topic, id: '' }).catch(() => {})),
+    publish: (topic, key, payload, tag, ttl = MIN5, prompt = false) => call('irn_publish', { topic, message: encrypt(key, payload), ttl, tag, prompt }),
+    close: () => sock && sock.close(),
+  };
+}
+const persistedClient = (state, save) => async () => {
+  const st = state();
+  if (!st.client) (st.client = await newClientKey()), save(st);
+  return st.client;
+};
+const safeEmit = (onEvent) => (e) => {
+  try {
+    onEvent(e);
+  } catch {}
+};
+
+// ---- an owner's wallet (e.g. on a phone), connected to roles.wei ----
+
+const RES = { settle: 1103, update: 1105, extend: 1107, event: 1111, del: 1113, ping: 1115 };
+const PROPOSE = 1100;
+const walletError = (e) => Object.assign(Error((e && e.message) || 'The wallet refused the request.'), { code: e && e.code });
+/** A session's accounts, as { account, chains } from its eip155 namespace. */
+function accountsOf(ns) {
+  const list = ((ns && ns.eip155 && ns.eip155.accounts) || []).map((a) => a.split(':')).filter((p) => p.length === 3);
+  return { account: list.length ? list[0][2].toLowerCase() : null, chains: [...new Set(list.map((p) => Number(p[1])))] };
+}
+
+/**
+ * connector({ projectId, load, save, onEvent }): roles.wei as a WalletConnect dapp, so an owner can sign
+ * with a wallet elsewhere. State { client, session: { topic, key, peer, account, chains, chainId, expiry } }.
+ * Events: { type: 'accounts' | 'chain' | 'disconnect' | 'error' | 'closed' }.
+ */
+export function connector({ projectId, load, save, onEvent }) {
+  const state = () => ({ ...(load() || {}) });
+  const emit = safeEmit(onEvent);
+  const r = relay({ projectId, client: persistedClient(state, save), emit, live: () => !!state().session });
+  const waiting = new Map(); // wc request id → { res, rej }
+  const setSession = (s) => {
+    const st = state();
+    s ? (st.session = s) : delete st.session;
+    save(st);
+  };
+
+  const handler = (topic, key) => async (message) => {
+    const m = decrypt(key, message);
+    if (!m) return;
+    if (!m.method) {
+      const w = waiting.get(m.id);
+      if (w) waiting.delete(m.id), m.error ? w.rej(walletError(m.error)) : w.res(m.result);
+      return;
+    }
+    const ok = (tag) => r.publish(topic, key, { id: m.id, jsonrpc: '2.0', result: true }, tag, DAY).catch(() => {});
+    const s = state().session;
+    if (!s || s.topic !== topic) return;
+    if (m.method === 'wc_sessionPing') return ok(RES.ping);
+    if (m.method === 'wc_sessionExtend') return setSession({ ...s, expiry: Number(m.params.expiry) || s.expiry }), ok(RES.extend);
+    if (m.method === 'wc_sessionUpdate') {
+      const a = accountsOf(m.params.namespaces);
+      setSession({ ...s, ...a, chainId: a.chains.includes(s.chainId) ? s.chainId : a.chains[0] });
+      return ok(RES.update), emit({ type: 'accounts' });
+    }
+    if (m.method === 'wc_sessionEvent') {
+      ok(RES.event);
+      const e = (m.params && m.params.event) || {};
+      if (e.name === 'chainChanged' && s.chains.includes(Number(e.data))) return setSession({ ...s, chainId: Number(e.data) }), emit({ type: 'chain' });
+      if (e.name === 'accountsChanged' && Array.isArray(e.data) && e.data.length) {
+        const a = String(e.data[0]).split(':').pop().toLowerCase();
+        if (/^0x[0-9a-f]{40}$/.test(a)) return setSession({ ...s, account: a }), emit({ type: 'accounts' });
+      }
+      return;
+    }
+    if (m.method === 'wc_sessionDelete') return ok(RES.del), drop(), emit({ type: 'disconnect' });
+  };
+  function drop() {
+    const s = state().session;
+    if (!s) return;
+    setSession(null);
+    r.unsubscribe(s.topic);
+    for (const w of waiting.values()) w.rej(walletError({ code: 4900, message: 'The wallet disconnected.' }));
+    waiting.clear();
+    r.close();
+  }
+
+  /**
+   * Start a connection: returns { uri, approved, cancel }. Show `uri` (a QR code) to the wallet;
+   * `approved` resolves with the session once the wallet approves.
+   */
+  async function connect({ chains, methods, events, metadata }) {
+    const symKey = random(32), pairing = await topicOf(symKey), kp = await keyPair(), expiry = Math.floor(Date.now() / 1000) + MIN5, pid = r.id();
+    const uri = 'wc:' + pairing + '@2?relay-protocol=irn&symKey=' + hex(symKey) + '&expiryTimestamp=' + expiry;
+    let fail, timer;
+    const approved = new Promise((res, rej) => {
+      fail = (e) => (clearTimeout(timer), r.unsubscribe(pairing), rej(e));
+      timer = setTimeout(() => fail(Error('The connection request expired. Try again with a new QR code.')), MIN5 * 1000);
+      r.subscribe(pairing, async (message) => {
+        const m = decrypt(symKey, message);
+        if (!m || m.id !== pid) return;
+        if (m.error) return fail(walletError({ code: 4001, message: 'The connection was rejected in the wallet.' }));
+        const key = await sharedKey(kp.privateKey, m.result.responderPublicKey), topic = await topicOf(key);
+        r.unsubscribe(pairing);
+        const normal = handler(topic, key);
+        await r.subscribe(topic, async (message) => {
+          const x = decrypt(key, message);
+          if (!x || x.method !== 'wc_sessionSettle') return normal(message);
+          await r.publish(topic, key, { id: x.id, jsonrpc: '2.0', result: true }, RES.settle, MIN5).catch(() => {});
+          const a = accountsOf(x.params.namespaces);
+          if (!a.account) return fail(Error('The wallet connected without an account.'));
+          const s = { topic, key: hex(key), peer: (x.params.controller && x.params.controller.metadata) || {}, ...a, chainId: a.chains[0], expiry: Number(x.params.expiry) };
+          clearTimeout(timer);
+          setSession(s);
+          r.listen(topic, normal);
+          res(s);
+        });
+      })
+        .then(() =>
+          r.publish(pairing, symKey, {
+            id: pid, jsonrpc: '2.0', method: 'wc_sessionPropose',
+            params: { requiredNamespaces: {}, optionalNamespaces: { eip155: { chains: chains.map((c) => 'eip155:' + c), methods, events } }, relays: [{ protocol: 'irn' }], proposer: { publicKey: hex(kp.pub), metadata }, expiryTimestamp: expiry, pairingTopic: pairing },
+          }, PROPOSE, MIN5, true),
+        )
+        .catch(fail);
+    });
+    return { uri, approved, cancel: () => fail(walletError({ code: 4001, message: 'Connection cancelled.' })) };
+  }
+
+  /** Listen to the saved session again (after a reload). */
+  async function restore() {
+    const s = state().session;
+    if (!s) return null;
+    if (s.expiry * 1000 < Date.now()) return setSession(null), null;
+    r.listen(s.topic, handler(s.topic, unhex(s.key)));
+    await r.connect();
+    return s;
+  }
+
+  /** Send a request to the wallet; resolves with its answer (it may take the owner a while). */
+  async function request(method, params) {
+    const s = state().session;
+    if (!s) throw walletError({ code: 4900, message: 'The wallet is not connected.' });
+    await restore();
+    const rid = r.id(), key = unhex(s.key);
+    const answer = new Promise((res, rej) => {
+      waiting.set(rid, { res, rej });
+      setTimeout(() => waiting.has(rid) && (waiting.delete(rid), rej(Error('The wallet did not answer in 15 minutes.'))), MIN5 * 3 * 1000);
+    });
+    await r.publish(s.topic, key, { id: rid, jsonrpc: '2.0', method: 'wc_sessionRequest', params: { request: { method, params, expiryTimestamp: Math.floor(Date.now() / 1000) + MIN5 * 3 }, chainId: 'eip155:' + s.chainId } }, TAGS.request, MIN5 * 3, true);
+    return answer;
+  }
+
+  /** Use another chain the wallet approved for this session. */
+  function useChain(id) {
+    const s = state().session;
+    if (!s || !s.chains.includes(id)) return false;
+    setSession({ ...s, chainId: id });
+    return true;
+  }
+
+  async function disconnect() {
+    const s = state().session;
+    if (s) await r.connect().then(() => r.publish(s.topic, unhex(s.key), { id: r.id(), jsonrpc: '2.0', method: 'wc_sessionDelete', params: { code: 6000, message: 'User disconnected.' } }, TAGS.del, DAY)).catch(() => {});
+    drop();
+  }
+
+  return { connect, restore, request, useChain, disconnect, session: () => state().session || null };
+}
+
+const SIGNING = ['eth_sendTransaction', 'eth_signTypedData_v4', 'personal_sign'];
+
+/**
+ * An EIP-1193 provider over a connector: signing goes to the wallet; reads go to `rpcUrl(chainId)`
+ * (a phone wallet does not serve eth_call and logs over WalletConnect). `pair(connection)` shows
+ * the QR code for a new connection and returns a function that hides it; `asking(method)` likewise
+ * while a request waits for the owner.
+ */
+export function provider(conn, { rpcUrl, pair, chains, metadata, asking = () => () => {} }) {
+  const ls = {};
+  const fire = (ev, x) => (ls[ev] || []).forEach((f) => f(x));
+  const now = () => conn.session();
+  const accounts = () => (now() ? [now().account] : []);
+  const chainId = () => (now() && now().chainId) || 1; // reads work before connecting, on Ethereum
+  async function read(method, params) {
+    return jsonRpc(rpcUrl(chainId()), method, params);
+  }
+  return {
+    isWalletConnect: true,
+    on: (ev, f) => (ls[ev] = [...(ls[ev] || []), f]),
+    removeListener: (ev, f) => (ls[ev] = (ls[ev] || []).filter((x) => x !== f)),
+    /** The connector's events, relayed as EIP-1193 events. */
+    notify: (e) => (e.type === 'chain' ? fire('chainChanged', '0x' + chainId().toString(16)) : e.type === 'accounts' || e.type === 'disconnect' ? fire('accountsChanged', accounts()) : null),
+    async request({ method, params = [] }) {
+      if (method === 'eth_chainId') return '0x' + chainId().toString(16);
+      if (method === 'eth_accounts') return accounts();
+      if (method === 'eth_requestAccounts') {
+        if (now()) return accounts();
+        const c = await conn.connect({ chains, methods: [...SIGNING], events: ['chainChanged', 'accountsChanged'], metadata });
+        const hide = pair(c);
+        try {
+          await c.approved;
+        } finally {
+          hide();
+        }
+        return accounts();
+      }
+      if (method === 'wallet_switchEthereumChain') {
+        const id = Number(params[0] && params[0].chainId);
+        if (!conn.useChain(id)) throw walletError({ code: 4902, message: 'The connected wallet did not approve this chain.' });
+        return fire('chainChanged', '0x' + id.toString(16)), null;
+      }
+      if (method === 'wallet_revokePermissions') return conn.disconnect(), null;
+      if (SIGNING.includes(method)) {
+        const done = asking(method);
+        try {
+          return await conn.request(method, params);
+        } finally {
+          done();
+        }
+      }
+      return read(method, params);
+    },
+  };
+}

@@ -9,10 +9,13 @@
     "dev": "node scripts/dev.mjs",
     "fork": "node scripts/fork.mjs",
     "test": "node --test test/unit/*.test.mjs",
-    "test:fork": "node --test --test-concurrency=1 test/fork/*.test.mjs"
+    "test:fork": "node --test --test-concurrency=1 test/fork/*.test.mjs",
+    "test:net": "node --test --test-force-exit 'test/net/*.test.mjs'"
   },
   "devDependencies": {
+    "@walletconnect/sign-client": "^2.25.0",
     "esbuild": "^0.28.2",
+    "jsqr": "^1.4.0",
     "viem": "^2.56.9"
   }
 }

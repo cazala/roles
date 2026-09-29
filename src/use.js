@@ -8,7 +8,7 @@ const receipt=async(request,hash)=>{for(let i=0;i<120;i++){const r=await request
 
 export function useRole(ctx,key) {
   const role=ctx.state.roles[key],targets=Object.values(role.targets).filter(t=>t.clearance>0);
-  const {body}=sheet('shield','Use role',true),out=h('div'),builder=h('div');
+  const {body}=sheet('people','Use role',true),out=h('div'),builder=h('div');
   body.classList.add('fulladdr');
   const abi=h('textarea',{'aria-label':'Target ABI',placeholder:'Paste a JSON ABI or function transfer(address recipient, uint256 amount)',spellcheck:'false'});
   const load=h('button.primary','Load ABI');

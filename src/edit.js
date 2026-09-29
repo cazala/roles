@@ -85,7 +85,7 @@ export async function directApply(ctx,d,status) {
   }
 }
 export function review(ctx) {
-  const d=draft(ctx),calls=diff(d.base,d.value,ctx.address),{body,close}=sheet('shield','Review changes',true),out=h('div');
+  const d=draft(ctx),calls=diff(d.base,d.value,ctx.address),{body,close}=sheet('people','Review changes',true),out=h('div');
   body.classList.add('fulladdr');
   put(body,h('p','Modifier ',addr(ctx.address), ' · Chain '+ctx.chain),calls.map(c=>h('div.panel',h('b',c.text),c.danger&&warn('This changes access to the Safe’s assets. Review every address and parameter.'),h('pre',json(c.args)),h('details',h('summary','Calldata and signature'),h('code',c.signature),h('pre',c.data)))));
   if(!calls.length){body.append(h('p','No onchain changes.'));return;}
