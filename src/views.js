@@ -3,7 +3,7 @@ import { createView } from './create.js';
 import { useRole } from './use.js';
 import { editConditions } from './condition-edit.js';
 import { conditionView, allowanceView } from './condition-view.js';
-import { h, put, addr, bad, warn, act, short } from './ui.js';
+import { h, put, addr, bad, warn, act, short, icon } from './ui.js';
 import { session, route, settingsDialog } from './app.js';
 import { explorerKey } from './reads.js';
 import { identify, metadata, safeModules, replay, keyName, json, quantity } from './roles.js';
@@ -53,16 +53,30 @@ export async function renderAddress(address, path, epoch) {
   if (!info.supported) { root.append(h('p.mut', 'This implementation is identified but is not supported for permission decoding or editing.'), h('details', h('summary', 'Implementation'), addr(info.implementation), h('pre', info.code))); return root; }
   root.append(tabbar(address, path[0] === 'allowances' ? 'allowances' : 'roles'));
   // One status under the actions: progress while scanning, the result when done, or what went wrong.
-  const status = h('div.scanstatus'), content = h('div');
-  const say = (...t) => put(status, h('p.mut', ...t)), fail = (...t) => put(status, warn(...t));
-  say('Preparing history scan…');
-  // While a scan runs block by block, point to the fast path, inline: an Etherscan key loads it in a few requests.
-  const tip = () => !explorerKey() && !request.wide && [' · ', h('a.hint', { href: '#', title: 'An Etherscan API key loads the history in a few requests instead of scanning block by block', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Add an Etherscan key'), ' to load instantly'];
-  const start = h('input', { 'aria-label': 'History start block', placeholder: 'Auto-detect deployment block', inputmode: 'numeric' });
-  const go = h('button', 'Scan / resume'), pause = h('button', 'Pause');
-  let controller, scanning = false;
+  // The history as a sync indicator: status first, one action for the current state, the rare options under ⋯.
+  const content = h('div'), icn = h('span.sicon'), text = h('div.stext'), action = h('div.sact'), fill = h('span'), hint = h('div.shint');
+  const menu = h('div.dropdown', { hidden: true }), more = h('button.ib', { title: 'History options', 'aria-label': 'History options', onclick: () => (menu.hidden = !menu.hidden) }, icon('M5 12h.01', 'M12 12h.01', 'M19 12h.01'));
+  const bar = h('div.sync', h('div.sline', icn, text, action, h('div.smore', more, menu)), h('div.meter', fill), hint);
+  const num = (n) => Number(n).toLocaleString('en-US');
+  const button = (label, fn) => h('button', { onclick: fn }, label);
+  /** One state: kind (busy / done / paused / error / partial), text, action, progress 0–100 or null, hint. */
+  const show = (kind, words, act, pct = null, tip = null) => {
+    bar.className = 'sync ' + kind;
+    put(icn, kind === 'busy' ? h('span.spin') : icon(...(kind === 'done' ? ['m5 12 5 5 9-10'] : kind === 'error' ? ['M12 9v4', 'M12 17h.01', 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'] : ['M9 6v12', 'M15 6v12'])));
+    put(text, words);
+    put(action, act);
+    bar.classList.toggle('metered', pct != null);
+    fill.style.width = (pct || 0) + '%';
+    put(hint, tip);
+  };
+  // While a scan runs block by block, point to the fast path: an Etherscan key loads it in a few requests.
+  const tip = () => !explorerKey() && !request.wide && [h('a.hint', { href: '#', title: 'An Etherscan API key loads the history in a few requests instead of scanning block by block', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Add an Etherscan key'), ' to load instantly'];
+  const start = h('input', { 'aria-label': 'Start block', placeholder: 'Deployment block (automatic)', inputmode: 'numeric' });
+  let controller, scanning = false, last = null;
   const run = async () => {
-    if (scanning) return; scanning = true; go.disabled = true; pause.disabled = false; controller = new AbortController();
+    if (scanning) return; scanning = true; menu.hidden = true;
+    const mine = (controller = new AbortController()); // a newer run (Apply, Clear) takes over the bar
+    const pause = button('Pause', () => mine.abort());
     // Progress: share of blocks done, events, and a time estimate from this run's own pace (after a few seconds).
     let t0 = 0, b0 = 0;
     const progress = (p) => {
@@ -71,9 +85,11 @@ export async function renderAddress(address, path, epoch) {
       const pct = p.block > p.start ? Math.floor((100 * (p.last - p.start + 1)) / (p.block - p.start + 1)) : 100;
       const rate = (p.last - b0) / (now - t0), left = rate > 0 ? (p.block - p.last) / rate : 0;
       const eta = now - t0 < 3000 || !(rate > 0) ? '' : left < 60000 ? ' · < 1 min left' : left < 3600000 ? ' · ~' + Math.round(left / 60000) + ' min left' : ' · ~' + Math.round(left / 3600000) + ' h left';
-      say('Scanning history · ' + pct + '% · ' + p.events + ' event' + (p.events === 1 ? '' : 's') + eta, p.last < p.block && tip());
+      if (controller !== mine) return;
+      last = pct;
+      show('busy', 'Scanning history · ' + pct + '% · ' + p.events + ' event' + (p.events === 1 ? '' : 's') + eta, pause, pct, p.last < p.block && tip());
     };
-    say('Finding where this modifier’s history starts…', tip());
+    show('busy', 'Finding where this modifier’s history starts…', pause, 0, tip());
     try {
       // The scan saves its progress every few windows; keep going until it catches up or is paused.
       let result;
@@ -81,24 +97,27 @@ export async function renderAddress(address, path, epoch) {
       while (!result.caughtUp && !controller.signal.aborted);
       const state = replay(result.logs);
       if (result.caughtUp && result.hash !== snapshot.hash) throw Error('Snapshot changed during scan. Refresh the page.');
-      if (result.complete && ['owner', 'avatar', 'target'].some(k => state[k] !== meta[k])) throw Error('History does not match current contract metadata. Reset and rescan before editing.');
+      if (result.complete && ['owner', 'avatar', 'target'].some(k => state[k] !== meta[k])) throw Error('History does not match current contract metadata. Clear the cached history and scan again before editing.');
       const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, ownerSafe, refresh: route };
-      say((result.complete ? 'Complete history' : result.caughtUp ? 'Partial history — editing disabled' : 'Paused — resume scanning') + ' · blocks ' + result.start + '–' + result.last + (provider.source ? ' · read through ' + provider.source : ''));
+      const span = ' · blocks ' + num(result.start) + ' – ' + num(result.last) + (provider.source ? ' · read through ' + provider.source : '');
+      if (result.complete) show('done', 'Complete history' + span, button('Refresh', () => route()));
+      else show('partial', 'Partial history, from a start block you chose · editing disabled' + span, button('Refresh', () => route()));
       put(content, body(ctx, path));
     } catch (e) {
-      if (epoch !== session.epoch) return;
-      if (controller.signal.aborted) say('Paused. Scan / resume continues from where it stopped.');
+      if (epoch !== session.epoch || controller !== mine) return;
+      if (mine.signal.aborted) show('paused', 'Paused' + (last != null ? ' at ' + last + '%' : ''), button('Resume', run));
       // The RPC advice only where an RPC is the problem.
-      else fail(e.message.replace(/\.?$/, '.'), /stopped at block|could not be reached|rpc|history|pruned|archive|answered/i.test(e.message) ? ' If an RPC cannot serve this history, add one for this chain in Settings, or set a start block in History options.' : '');
+      else show('error', [e.message.replace(/\.?$/, '.'), /stopped at block|could not be reached|rpc|history|pruned|archive|answered/i.test(e.message) ? ' If an RPC cannot serve this history, add one for this chain in Settings.' : ''], button('Retry', run));
     }
-    finally { scanning = false; go.disabled = false; pause.disabled = true; }
+    finally { if (controller === mine) scanning = false; }
   };
-  pause.onclick = () => controller?.abort(); go.onclick = run;
-  // Actions in one row (History options opens under its own toggle), then the status, then the content.
-  const options = h('details.hopts', h('summary', 'History options'), h('div.dropdown', h('label', 'Start block'), start, h('p.mut.small', 'Leave empty for the complete history. A later start is read-only.')));
-  const closeOptions = (e) => (options.isConnected ? !options.contains(e.target) && (options.open = false) : removeEventListener('pointerdown', closeOptions));
-  addEventListener('pointerdown', closeOptions); // a tap anywhere else closes History options
-  root.append(h('div.actions.scanbar', go, pause, h('button.link', { onclick: () => { controller?.abort(); clearScan(chain, address); put(content); say('Cache cleared. Scan / resume starts over.'); } }, 'Reset cache'), options), status, content);
+  const restart = () => { controller?.abort(); clearScan(chain, address); put(content); scanning = false; run(); };
+  put(menu,
+    h('label', 'Start from block'), h('div.row', start, button('Apply', restart)), h('p.mut.small', 'Leave empty for the complete history. A later start is read-only.'),
+    h('button.link.sclear', { onclick: restart }, 'Clear cached history and scan again'));
+  const closeMenu = (e) => (bar.isConnected ? !bar.querySelector('.smore').contains(e.target) && (menu.hidden = true) : removeEventListener('pointerdown', closeMenu));
+  addEventListener('pointerdown', closeMenu); // a tap anywhere else closes the menu
+  root.append(bar, content);
   run();
   return root;
 }
