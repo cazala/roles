@@ -7,8 +7,11 @@ export const socket = (url) => new WebSocket(url);
 /** GET or POST JSON over HTTPS (the one fetch in the page). */
 async function json(url, body, what = 'The RPC') {
   const res = await fetch(url, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
-  if (!res.ok) throw Error(what + ' answered ' + res.status + (res.status === 429 ? ' (too many requests): try again in a moment.' : '.'));
-  return res.json();
+  if (res.ok) return res.json();
+  // Many RPCs answer an HTTP error with a JSON-RPC error inside (e.g. a log range too wide): keep its message.
+  const j = await res.json().catch(() => null);
+  if (j && j.error) return j;
+  throw Error(what + ' answered ' + res.status + (res.status === 429 ? ' (too many requests): try again in a moment.' : '.'));
 }
 /** A GET returning JSON (the block explorer API). */
 export const getJson = (url) => json(url, null, 'The block explorer');

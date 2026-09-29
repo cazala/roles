@@ -115,7 +115,7 @@ function settingsDialog() {
   const out = h('div'), list = h('div'), host = (u) => { try { return new URL(u).host; } catch { return u; } };
   const draw = () => {
     const m = Object.entries(rpcs());
-    put(list, m.length ? h('div.slist', m.map(([c, u]) => h('div.srow', h('b', network(Number(c))), h('code.sa', host(u)), h('span.grow'), h('button.link', { onclick: () => (removeRpc(c), draw(), route()) }, 'Remove')))) : h('p.mut.small', 'None: reads go through your wallet.'));
+    put(list, m.length ? h('div.slist.rpcs', m.map(([c, u]) => h('div.srow', h('b', network(Number(c))), h('code.sa', host(u)), h('span.grow'), h('button.link', { onclick: () => (removeRpc(c), draw(), route()) }, 'Remove')))) : h('p.mut.small', 'None: reads go through your wallet.'));
   };
   const url = h('input', { placeholder: 'https://… (Alchemy, Infura, your node)', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'RPC URL' }), add = h('button', 'Add');
   add.onclick = act(add, async () => { const c = await addRpc(url.value); url.value = ''; draw(); put(out, h('p.ok', 'Added for ' + network(c) + '.')); route(); }, out);

@@ -84,3 +84,13 @@ test('with an Etherscan key, the scan takes the whole history in a few requests 
   setExplorerKey('');
   assert.equal(r.wide, false);
 });
+
+test('an RPC error inside an HTTP error keeps its message (so a too-wide log range is narrowed)', async () => {
+  const saved = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 400, json: async () => ({ jsonrpc: '2.0', id: 1, error: { code: -32600, message: 'You can make eth_getLogs requests with up to a 10 block range.' } }) });
+  const { jsonRpc } = await import('../../src/net.js');
+  await assert.rejects(jsonRpc('https://x.example', 'eth_getLogs', [{}]), /10 block range/);
+  globalThis.fetch = async () => ({ ok: false, status: 502, json: async () => { throw Error('not json'); } });
+  await assert.rejects(jsonRpc('https://x.example', 'eth_chainId'), /answered 502/);
+  globalThis.fetch = saved;
+});

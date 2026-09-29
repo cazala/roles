@@ -510,3 +510,6 @@ p.wsec { margin: 18px 0 0; color: var(--mut); font-size: 13px; font-weight: 500;
 .qrcode { display: flex; justify-content: center; margin: 12px 0; }
 .qrcode svg { width: min(300px, 100%); height: auto; border-radius: 8px; }
 .qracts { justify-content: center; }
+/* Settings: saved RPC endpoints, spaced from the field below; Remove inset from the edge. */
+.slist.rpcs { margin-bottom: 10px; }
+.slist.rpcs .srow { padding-right: 14px; }
