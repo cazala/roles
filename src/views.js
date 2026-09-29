@@ -14,14 +14,7 @@ editorHooks.use = useRole;
 editorHooks.conditions = editConditions;
 export const tabbar = (address, active) => h('nav.tabs', ['roles', 'allowances'].map(name => h('a' + (name === active ? '.on' : ''), { href: '#/' + address + (name === 'roles' ? '' : '/' + name) }, name[0].toUpperCase() + name.slice(1))));
 const options = n => ['CALL, no ETH', 'CALL with ETH', 'CALL or DELEGATECALL, no ETH', 'CALL or DELEGATECALL with ETH'][n];
-export function roleView(ctx, key) {
-  const role = ctx.state.roles[key];
-  if (!role) return h('p.mut', 'No role with this key was found in the scanned history.');
-  return h('div', h('h2', keyName(key)), h('details', h('summary', 'Role key'), h('code', key)),
-    h('h3', 'Members'), Object.entries(role.members).filter(([, yes]) => yes).length ? h('div.slist', Object.entries(role.members).filter(([, yes]) => yes).map(([address]) => h('div.srow', addr(address), !ctx.state.enabled[address] && h('span.chip.warn', 'Disabled'), ctx.state.defaults[address] === key && h('span.chip', 'Default role')))) : h('p.empty', 'No members assigned.'),
-    h('h3', 'Targets and functions'), Object.values(role.targets).length ? Object.values(role.targets).map(t => h('section.panel', addr(t.address), h('p.mut', ['Revoked — stored functions are dormant', 'All functions allowed', 'Only configured functions'][t.clearance] + ' · ' + options(t.options)),
-      Object.values(t.functions).length ? Object.values(t.functions).map(f => h('details', h('summary', f.selector + ' · ' + options(f.options)), t.clearance !== 2 && h('p.warn', 'This function entry is dormant under the current target clearance.'), f.conditions ? (hooks.conditions ? hooks.conditions(f.conditions) : h('pre', json(f.conditions))) : h('p', 'Any parameters allowed.'))) : t.clearance === 2 && h('p.empty', 'No functions configured for this target.'))) : h('p.empty', 'No targets configured for this role.'));
-}
+export { roleView } from './role-view.js';
 export function body(ctx, path) {
   if (hooks.body) { const custom = hooks.body(ctx, path); if (custom) return custom; }
   if (path[0] === 'role') return roleView(ctx, path[1]);

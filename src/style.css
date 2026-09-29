@@ -554,3 +554,47 @@ a.hint:hover { text-decoration: underline; }
 details.edetail { margin: 6px 0 0; border: 0; }
 details.edetail > summary { padding: 2px 0; font-size: 12px; color: var(--mut); }
 details.edetail pre { max-height: 180px; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Role page: Permissions (target cards → functions → condition table) and Members. */
+.role h2 { margin-bottom: 4px; }
+p.rkey { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; overflow-wrap: anywhere; }
+nav.rtabs { margin-bottom: 14px; }
+.tcard { margin: 0 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; }
+.thead { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.tid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tname { font-size: 15px; }
+.tid .addr code { font-size: 12px; color: var(--mut); overflow-wrap: anywhere; }
+.tbody { display: flex; flex-direction: column; }
+.tfoot { padding: 8px 14px 12px; border-top: 1px solid var(--line); }
+.tfoot p { margin: 0 0 4px; }
+.tfoot details { margin: 0; border: 0; }
+.tfoot textarea { width: 100%; margin-top: 6px; font-family: ui-monospace, monospace; font-size: 12px; }
+.fn { padding: 12px 14px; }
+.fn + .fn { border-top: 1px solid var(--line); }
+.fnhead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+code.sig { font-size: 13px; overflow-wrap: anywhere; }
+code.sig b { font-weight: 700; }
+.chip.mono { font-family: ui-monospace, monospace; font-size: 11px; }
+p.fnfree { margin: 8px 0 0; }
+/* The condition table: one row per parameter; groups (AND / OR / NOR) as a labelled bracket. */
+.ctable { margin-top: 10px; font-size: 13px; }
+.crow { display: grid; grid-template-columns: minmax(90px, 1.1fr) minmax(70px, .7fr) minmax(110px, 1fr) minmax(0, 2fr); gap: 10px; align-items: baseline; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.crow + .crow, .cparts > * + *, .cgbody > * + * { margin-top: 6px; }
+.crow.chead { padding-top: 0; padding-bottom: 4px; border: 0; background: none; color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.cname { font-weight: 600; overflow-wrap: anywhere; }
+.ctype { color: var(--mut); font-family: ui-monospace, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.cop { font-style: italic; }
+.cvalue { min-width: 0; overflow-wrap: anywhere; }
+code.cval { font-size: 12px; overflow-wrap: anywhere; }
+.cgroup { display: flex; gap: 8px; }
+.cgroup + *, * + .cgroup { margin-top: 6px; }
+/* A bracket along the group, its label (AND / OR / NOR) centered on it. */
+.clabel { flex: none; width: 14px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--mut); border-right: 0; border-radius: 6px 0 0 6px; color: var(--mut); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.clabel span { writing-mode: vertical-rl; transform: rotate(180deg); margin-left: -20px; padding: 4px 0; background: var(--card); }
+.cgbody { flex: 1; min-width: 0; }
+.cnest > .cparts { margin: 6px 0 0 18px; }
+@media (max-width: 600px) {
+  .crow { grid-template-columns: 1fr auto; }
+  .crow .cop, .crow .cvalue { grid-column: 1 / -1; }
+  .crow.chead { display: none; }
+  .cnest > .cparts { margin-left: 10px; }
+}

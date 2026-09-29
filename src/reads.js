@@ -130,3 +130,28 @@ export function reader(wallet, { chain, projectId }) {
   }
   return r;
 }
+
+/**
+ * A contract's name and verified ABI from Etherscan (merged with its implementation's, for a proxy), for display
+ * only: function names are matched to the selectors that execute. Cached per chain and address.
+ */
+export async function explorerSource(key, chain, address) {
+  const cache = 'src:' + chain + ':' + address, hit = load(cache, null);
+  if (hit && typeof hit === 'object') return hit;
+  const get = async (a) => {
+    const r = await getJson('https://api.etherscan.io/v2/api?' + new URLSearchParams({ chainid: chain, module: 'contract', action: 'getsourcecode', address: a, apikey: key }));
+    if (r.status !== '1' || !Array.isArray(r.result) || !r.result[0]) throw Error('Etherscan: ' + (typeof r.result === 'string' ? r.result : r.message || 'request failed'));
+    return r.result[0];
+  };
+  const s = await get(address), abis = [];
+  if (String(s.ABI).startsWith('[')) abis.push(...JSON.parse(s.ABI));
+  let name = s.ContractName || null;
+  if (s.Proxy === '1' && /^0x[0-9a-fA-F]{40}$/.test(s.Implementation || '')) {
+    const i = await get(s.Implementation.toLowerCase());
+    if (String(i.ABI).startsWith('[')) abis.push(...JSON.parse(i.ABI));
+    name = name || i.ContractName || null;
+  }
+  const out = { name, abi: abis.length ? JSON.stringify(abis) : null };
+  store(cache, out);
+  return out;
+}
