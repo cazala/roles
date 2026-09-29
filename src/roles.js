@@ -40,6 +40,8 @@ export async function safeModules(request, address, block = 'latest') {
   throw Error('Too many module pages');
 }
 const byTopic = new Map(events.map(e => [keccakText(e.name + '(' + e.inputs.map(canonical).join(',') + ')'), e]));
+/** RolesModSetup's topic: emitted once, by setUp, in the transaction that deploys the modifier. */
+export const SETUP_TOPIC = [...byTopic].find(([, e]) => e.name === 'RolesModSetup')[0];
 export function decodeEvent(log) {
   const event = byTopic.get(log.topics[0]?.toLowerCase());
   if (!event) return { name: 'Unknown', args: {}, raw: log };
