@@ -33,6 +33,20 @@ export function setExplorerKey(k) {
   store('explorerkey', k);
   return k;
 }
+// Etherscan's free plan allows a few requests per second: one at a time, spaced, and one retry on its rate limit.
+let lane = Promise.resolve();
+export function etherscan(query) {
+  const run = async () => {
+    for (let i = 0; ; i++) {
+      const r = await getJson('https://api.etherscan.io/v2/api?' + query);
+      if (i < 2 && r.status === '0' && /rate limit/i.test(String(r.result) + ' ' + r.message)) { await new Promise((ok) => setTimeout(ok, 1100)); continue; }
+      return r;
+    }
+  };
+  const next = lane.then(run);
+  lane = next.catch(() => {}).then(() => new Promise((ok) => setTimeout(ok, 250)));
+  return next;
+}
 const hx = (v) => (!v || v === '0x' ? '0x0' : v); // Etherscan writes zero as "0x"
 /**
  * eth_getLogs through Etherscan's API (one key, every chain it indexes): the whole range in pages of 1,000,
@@ -45,7 +59,7 @@ export async function explorerLogs(key, chain, { address, topics, fromBlock, toB
   for (;;) {
     const q = new URLSearchParams({ chainid: chain, module: 'logs', action: 'getLogs', address, fromBlock: from, toBlock: to, page, offset: 1000, apikey: key });
     if (topics && topics[0]) q.set('topic0', topics[0]);
-    const r = await getJson('https://api.etherscan.io/v2/api?' + q);
+    const r = await etherscan(q);
     if (r.status !== '1' && !/no records/i.test(r.message || '')) throw Error('Etherscan: ' + (typeof r.result === 'string' ? r.result : r.message || 'request failed') + '. Check the API key in History options.');
     const list = Array.isArray(r.result) ? r.result : [];
     for (const l of list) {
