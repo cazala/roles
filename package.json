@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "deployer": "node scripts/deployer/serve.mjs",
     "dev": "node scripts/dev.mjs",
     "fork": "node scripts/fork.mjs",
     "test": "node --test test/unit/*.test.mjs",

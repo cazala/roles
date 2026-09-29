@@ -89,23 +89,25 @@ export function review(ctx) {
   body.classList.add('fulladdr');
   put(body,h('p','Modifier ',addr(ctx.address), ' · Chain '+ctx.chain),calls.map(c=>h('div.panel',h('b',c.text),c.danger&&warn('This changes access to the Safe’s assets. Review every address and parameter.'),h('pre',json(c.args)),h('details',h('summary','Calldata and signature'),h('code',c.signature),h('pre',c.data)))));
   if(!calls.length){body.append(h('p','No onchain changes.'));return;}
+  const direct=d.base.owner===session.account, supported=direct||ctx.ownerSafe;
+  if(!supported){body.append(warn('This modifier owner is neither the connected wallet nor a readable Safe. Review the calls above, then use a tool that can act for '+d.base.owner+'.'));return;}
   const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:load('gateway','https://safe.wei.limo/')});
   const nonce=h('input',{'aria-label':'Safe nonce',placeholder:'Current Safe nonce',inputmode:'numeric'});
-  const apply=h('button.primary',d.base.owner===session.account?'Apply changes':'Prepare safe.wei link');
+  const apply=h('button.primary',direct?'Apply changes':'Prepare safe.wei link');
   let running=false;
   apply.onclick=act(apply,async()=>{
     if(running)return;running=true;
     try {
       await preflight(ctx,d);
-      if(d.base.owner===session.account) {await directApply(ctx,d,text=>put(out,h('p',text)));drafts.delete(id(ctx));close();ctx.refresh();}
+      if(direct) {await directApply(ctx,d,text=>put(out,h('p',text)));drafts.delete(id(ctx));close();ctx.refresh();}
       else {const base=gateway(gatewayInput.value);const result=await proposal(ctx.request,ctx.chain,d.base.owner,calls,base,nonce.value);store('gateway',base);apply.classList.remove('primary');put(out,h('p','Send this link to the owners. Execution happens in safe.wei.'),h('a.btn.primary',{href:result.url,target:'_blank',rel:'noopener'},'Open in safe.wei to approve'),copyButton('Copy link',result.url));}
     } finally {running=false;}
   },out);
-  if (d.base.owner !== session.account) body.append(h('details',h('summary','Safe hand-off options'),h('label','safe.wei gateway'),gatewayInput,h('label','Safe nonce (current or later)'),nonce));
+  if (!direct) body.append(h('details',h('summary','Safe hand-off options'),h('label','safe.wei gateway'),gatewayInput,h('label','Safe nonce (current or later)'),nonce));
   body.append(h('div.actions',apply),out);
 }
 export function editBody(ctx,path) {
-  if(!ctx.complete)return null;
+  if(!ctx.complete||ctx.info.faulty)return null;
   const d=draft(ctx),root=h('div');
   ctx.redraw=()=>{
     const calls=diff(d.base,d.value,ctx.address);
@@ -115,7 +117,7 @@ export function editBody(ctx,path) {
     if(path[0]==='role') {
       const key=path[1],member=d.value.roles[key]?.members[session.account]&&d.value.enabled[session.account];put(root,toolbar,roleView(stateCtx,key),h('div.actions',member&&editorHooks.use&&h('button.primary',{onclick:()=>editorHooks.use(ctx,key)},'Use this role'),h('button',{onclick:()=>memberForm(ctx,key)},'Edit members'),h('button',{onclick:()=>targetForm(ctx,key)},'Edit target'),h('button',{onclick:()=>functionForm(ctx,key)},'Edit function'),editorHooks.conditions&&h('button',{onclick:()=>editorHooks.conditions(ctx,key)},'Edit conditions')));
     } else if(path[0]==='allowances')put(root,toolbar,allowanceView(stateCtx),h('button',{onclick:()=>allowanceForm(ctx)},'Set allowance'),Object.keys(d.value.allowances).map(key=>h('div.actions',h('button.link',{onclick:()=>allowanceForm(ctx,key)},'Edit '+keyName(key)))));
-    else put(root,toolbar,h('h2','Roles'),h('div.slist',Object.values(d.value.roles).map(r=>h('a.srow',{href:'#/'+ctx.address+'/role/'+r.key},h('b',keyName(r.key)),h('span.mut',Object.values(r.members).filter(Boolean).length+' members · '+Object.values(r.targets).filter(t=>t.clearance).length+' targets')))),h('div.actions',h('button',{onclick:()=>form('New role',[{key:'key',label:'Role name or bytes32 key'}],v=>{const key=roleKey(v.key);mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;})},'New role')),h('details',h('summary','Modifier settings'),h('div.actions',h('button',{onclick:()=>settings(ctx)},'Owner, avatar and target'),h('button',{onclick:()=>unwrapForm(ctx)},'Transaction unwrapper'))));
+    else {const roles=Object.values(d.value.roles);put(root,toolbar,h('h2','Roles'),roles.length?h('div.slist',roles.map(r=>h('a.srow',{href:'#/'+ctx.address+'/role/'+r.key},h('b',keyName(r.key)),h('span.mut',Object.values(r.members).filter(Boolean).length+' members · '+Object.values(r.targets).filter(t=>t.clearance).length+' targets')))):h('p.empty','No roles configured yet. Choose New role to start.'),h('div.actions',h('button',{onclick:()=>form('New role',[{key:'key',label:'Role name or bytes32 key'}],v=>{const key=roleKey(v.key);mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;})},'New role')),h('details',h('summary','Modifier settings'),h('div.actions',h('button',{onclick:()=>settings(ctx)},'Owner, avatar and target'),h('button',{onclick:()=>unwrapForm(ctx)},'Transaction unwrapper'))));}
   };
   ctx.redraw(); return root;
 }

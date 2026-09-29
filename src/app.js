@@ -1,5 +1,5 @@
 import { renderAddress } from './views.js';
-import { $, h, put, addr, short, icon, ICONS, sheet, bad, act, setResolver } from './ui.js';
+import { $, h, put, addr, short, icon, ICONS, sheet, bad, act, setResolver, friendlyError } from './ui.js';
 import { isAddr } from './abi.js';
 import { use, rpc } from './rpc.js';
 import { discover, list, remembered, remember } from './wallets.js';
@@ -10,7 +10,6 @@ import * as labels from './labels.js';
 export const session = { provider: null, account: null, chain: null, epoch: 0 };
 const main = $('main');
 const network = n => ({ 1: 'Ethereum', 100: 'Gnosis', 137: 'Polygon', 10: 'Optimism', 8453: 'Base', 42161: 'Arbitrum' }[n] || 'Chain ' + n);
-const error = e => e?.code === 4001 ? 'Request cancelled in your wallet.' : e?.message || String(e);
 let continuation = null;
 let saved = load('saved', []);
 if (!Array.isArray(saved)) saved = [];
@@ -83,7 +82,7 @@ export async function route() {
   if (!session.account) { put(main, h('div.home.gate', h('div.panel.gatecard', h('span.mark', icon(...ICONS.shield)), h('h2', 'Connect a wallet to open this address'), h('p', 'Chain reads use your wallet’s RPC.'), h('button.primary', { onclick: () => requireWallet(route) }, 'Connect a wallet')))); return; }
   try {
     const requested = new URLSearchParams(location.hash.split('?')[1] || '').get('chain');
-    if (requested && Number(requested) !== session.chain) { put(main, h('div.panel', h('h2', 'Switch to ' + network(Number(requested))), h('button.primary', { onclick: () => requireWallet(async () => { try { await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + Number(requested).toString(16) }]); await changed(); } catch (e) { main.append(bad(e.code === 4902 ? 'Add this chain in your wallet, then try again.' : error(e))); } }) }, 'Switch chain'))); return; }
+    if (requested && Number(requested) !== session.chain) { put(main, h('div.panel', h('h2', 'Switch to ' + network(Number(requested))), h('button.primary', { onclick: () => requireWallet(async () => { try { await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + Number(requested).toString(16) }]); await changed(); } catch (e) { main.append(bad(e.code === 4902 ? 'Add this chain in your wallet, then try again.' : friendlyError(e))); } }) }, 'Switch chain'))); return; }
     const address = await resolve(path[0]);
     put(main, h('p.mut', 'Reading the chain…'));
     const view = await renderAddress(address, path.slice(1), epoch);
@@ -91,7 +90,7 @@ export async function route() {
     if (!saved.some(x => x.address === address && x.chain === session.chain)) { saved.unshift({ address, chain: session.chain }); save(); }
     put($('crumb'), h('span.mut', '/'), h('a', { href: '#/' + address }, labels.get(address) || short(address)));
     put(main, view);
-  } catch (e) { if (epoch === session.epoch) put(main, bad(error(e)), h('a', { href: '#/' }, 'Open another address')); }
+  } catch (e) { if (epoch === session.epoch) put(main, bad(friendlyError(e)), h('a', { href: '#/' }, 'Open another address')); }
 }
 addEventListener('hashchange', route);
 discover(() => { header(); });

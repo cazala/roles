@@ -17,9 +17,9 @@ export function roleView(ctx, key) {
   const role = ctx.state.roles[key];
   if (!role) return h('p.mut', 'No role with this key was found in the scanned history.');
   return h('div', h('h2', keyName(key)), h('details', h('summary', 'Role key'), h('code', key)),
-    h('h3', 'Members'), Object.entries(role.members).filter(([, yes]) => yes).length ? h('div.slist', Object.entries(role.members).filter(([, yes]) => yes).map(([address]) => h('div.srow', addr(address), !ctx.state.enabled[address] && h('span.chip.warn', 'Disabled'), ctx.state.defaults[address] === key && h('span.chip', 'Default role')))) : h('p.mut', 'No members assigned.'),
-    h('h3', 'Targets and functions'), Object.values(role.targets).map(t => h('section.panel', addr(t.address), h('p.mut', ['Revoked — stored functions are dormant', 'All functions allowed', 'Only configured functions'][t.clearance] + ' · ' + options(t.options)),
-      Object.values(t.functions).map(f => h('details', h('summary', f.selector + ' · ' + options(f.options)), t.clearance !== 2 && h('p.warn', 'This function entry is dormant under the current target clearance.'), f.conditions ? (hooks.conditions ? hooks.conditions(f.conditions) : h('pre', json(f.conditions))) : h('p', 'Any parameters allowed.'))))));
+    h('h3', 'Members'), Object.entries(role.members).filter(([, yes]) => yes).length ? h('div.slist', Object.entries(role.members).filter(([, yes]) => yes).map(([address]) => h('div.srow', addr(address), !ctx.state.enabled[address] && h('span.chip.warn', 'Disabled'), ctx.state.defaults[address] === key && h('span.chip', 'Default role')))) : h('p.empty', 'No members assigned.'),
+    h('h3', 'Targets and functions'), Object.values(role.targets).length ? Object.values(role.targets).map(t => h('section.panel', addr(t.address), h('p.mut', ['Revoked — stored functions are dormant', 'All functions allowed', 'Only configured functions'][t.clearance] + ' · ' + options(t.options)),
+      Object.values(t.functions).length ? Object.values(t.functions).map(f => h('details', h('summary', f.selector + ' · ' + options(f.options)), t.clearance !== 2 && h('p.warn', 'This function entry is dormant under the current target clearance.'), f.conditions ? (hooks.conditions ? hooks.conditions(f.conditions) : h('pre', json(f.conditions))) : h('p', 'Any parameters allowed.'))) : t.clearance === 2 && h('p.empty', 'No functions configured for this target.'))) : h('p.empty', 'No targets configured for this role.'));
 }
 export function body(ctx, path) {
   if (hooks.body) { const custom = hooks.body(ctx, path); if (custom) return custom; }
@@ -44,7 +44,10 @@ export async function renderAddress(address, path, epoch) {
     return h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), hooks.create && hooks.create({ address, safe, request, snapshot, chain }), modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'));
   }
   const meta = await metadata(request, address, snapshot.number);
-  const root = h('div', h('h1', 'Roles ' + info.version), addr(address), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
+  let ownerSafe=false;
+  if(meta.owner!==session.account)try{await safeModules(request,meta.owner,snapshot.number);ownerSafe=true;}catch{}
+  const ownerSupported=meta.owner===session.account||ownerSafe;
+  const root = h('div', h('h1', 'Roles ' + info.version), addr(address), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), !ownerSupported&&warn('This owner is neither the connected wallet nor a readable Safe. You can inspect permissions and prepare calls, but roles.wei cannot submit them for this owner.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
   if (!info.supported) { root.append(h('p.mut', 'This implementation is identified but is not supported for permission decoding or editing.'), h('details', h('summary', 'Implementation'), addr(info.implementation), h('pre', info.code))); return root; }
   root.append(tabbar(address, path[0] === 'allowances' ? 'allowances' : 'roles'));
   const status = h('p.mut', 'Preparing history scan…'), content = h('div'), out = h('div');
@@ -58,7 +61,7 @@ export async function renderAddress(address, path, epoch) {
       const state = replay(result.logs);
       if (result.caughtUp && result.hash !== snapshot.hash) throw Error('Snapshot changed during scan. Refresh the page.');
       if (result.complete && ['owner', 'avatar', 'target'].some(k => state[k] !== meta[k])) throw Error('History does not match current contract metadata. Reset and rescan before editing.');
-      const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, refresh: route };
+      const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, ownerSafe, refresh: route };
       put(status, (result.complete ? 'Complete history' : result.caughtUp ? 'Partial history — editing disabled' : 'Paused — resume scanning') + ' · blocks ' + result.start + '–' + result.last);
       put(content, body(ctx, path));
     } catch (e) { if (epoch === session.epoch) put(out, warn(e.message + ' If historical reads are unavailable, enter a start block. A partial scan stays read-only.')); }
