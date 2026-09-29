@@ -106,6 +106,8 @@ export function reader(wallet, { chain, projectId }) {
       if (fallback.has(c) && HISTORY.includes(method)) return note(method, 'WalletConnect’s RPC'), jsonRpc(WC_RPC(c, projectId), method, params);
       try {
         const v = await wallet.request({ method, params });
+        // A wallet answering logs with no list (some do, for ranges too heavy for them) is treated as a refusal.
+        if (method === 'eth_getLogs' && !Array.isArray(v)) throw Error('history unavailable: the wallet answered eth_getLogs without a list');
         return note(method, null), v;
       } catch (e) {
         if (!HISTORY.includes(method) || !noHistory(e) || !projectId) throw e;

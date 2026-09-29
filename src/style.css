@@ -547,3 +547,6 @@ button.link.sclear { margin-top: 6px; padding: 8px 0 0; border-top: 1px solid va
 .sync.error { border-color: #c98a00; background: var(--warnbg); }
 .sync.error .sicon { color: #c98a00; }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } .meter span { transition: none; } }
+details.edetail { margin: 6px 0 0; border: 0; }
+details.edetail > summary { padding: 2px 0; font-size: 12px; color: var(--mut); }
+details.edetail pre { max-height: 180px; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }

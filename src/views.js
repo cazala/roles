@@ -107,7 +107,13 @@ export async function renderAddress(address, path, epoch) {
       if (epoch !== session.epoch || controller !== mine) return;
       if (mine.signal.aborted) show('paused', 'Paused' + (last != null ? ' at ' + last + '%' : ''), button('Resume', run));
       // The RPC advice only where an RPC is the problem.
-      else show('error', [e.message.replace(/\.?$/, '.'), /stopped at block|could not be reached|rpc|history|pruned|archive|answered/i.test(e.message) ? ' If an RPC cannot serve this history, add one for this chain in Settings.' : ''], button('Retry', run));
+      // RPC trouble: offer the ways around it right there (your RPC, or Etherscan's index).
+      else {
+        const rpc = /stopped at block|could not be reached|rpc|history|pruned|archive|answered/i.test(e.message);
+        // Details: the stack and the build, so an unexpected error can be traced to its line.
+        const details = h('details.edetail', h('summary', 'Details'), h('pre', 'build ' + __BUILD__ + '\n' + (e.stack || e.message)));
+        show('error', e.message.replace(/\.?$/, '.'), button('Retry', run), null, [rpc && h('span.fixes', 'Get around it: ', h('a.hint', { href: '#', onclick: (x) => (x.preventDefault(), settingsDialog()) }, 'Add your own RPC'), ' or ', h('a.hint', { href: '#', onclick: (x) => (x.preventDefault(), settingsDialog()) }, 'an Etherscan key'), '.'), details]);
+      }
     }
     finally { if (controller === mine) scanning = false; }
   };
