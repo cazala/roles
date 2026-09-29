@@ -139,7 +139,7 @@ export async function explorerSource(key, chain, address) {
   const cache = 'src:' + chain + ':' + address, hit = load(cache, null);
   if (hit && typeof hit === 'object') return hit;
   const get = async (a) => {
-    const r = await getJson('https://api.etherscan.io/v2/api?' + new URLSearchParams({ chainid: chain, module: 'contract', action: 'getsourcecode', address: a, apikey: key }));
+    const r = await etherscan(new URLSearchParams({ chainid: chain, module: 'contract', action: 'getsourcecode', address: a, apikey: key }));
     if (r.status !== '1' || !Array.isArray(r.result) || !r.result[0]) throw Error('Etherscan: ' + (typeof r.result === 'string' ? r.result : r.message || 'request failed'));
     return r.result[0];
   };
