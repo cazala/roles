@@ -513,3 +513,8 @@ p.wsec { margin: 18px 0 0; color: var(--mut); font-size: 13px; font-weight: 500;
 /* Settings: saved RPC endpoints, spaced from the field below; Remove inset from the edge. */
 .slist.rpcs { margin-bottom: 10px; }
 .slist.rpcs .srow { padding-right: 14px; }
+/* A highlighted suggestion (not muted): draws the eye while something is slow. */
+.tip { display: flex; align-items: center; gap: 14px; margin: 10px 0; padding: 12px 14px; border: 1px solid var(--fg); border-radius: 12px; background: var(--card); font-size: 14px; }
+.tip > div { flex: 1; min-width: 0; }
+.tip button { flex: none; }
+@media (max-width: 600px) { .tip { flex-direction: column; align-items: stretch; } }

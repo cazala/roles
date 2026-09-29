@@ -76,7 +76,7 @@ export async function scan(request, { address, chain, block, signal, progress = 
     const header = await request('eth_getBlockByNumber', [quantity(to), false]);
     if (!header || header.hash !== before?.hash) throw Error('Chain changed during scan. Reset and retry.');
     cache.logs.push(...logs); cache.last = to; cache.hash = header.hash;
-    store(key, cache); progress({ last: to, block, events: cache.logs.length }); windows++;
+    store(key, cache); progress({ start: cache.start, last: to, block, events: cache.logs.length }); windows++;
   }
   // A start typed by hand is still complete history when the scan contains the modifier's setup event.
   const setup = cache.logs.some(l => l.topics?.[0]?.toLowerCase() === SETUP_TOPIC);

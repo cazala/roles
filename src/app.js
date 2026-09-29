@@ -110,7 +110,7 @@ function walletDialog() {
 $('connect').onclick = walletDialog;
 
 /** Settings: RPC endpoints (reads go there instead of the wallet, per chain) and an Etherscan API key. */
-function settingsDialog() {
+export function settingsDialog() {
   const { body } = sheet('gear', 'Settings');
   const out = h('div'), list = h('div'), host = (u) => { try { return new URL(u).host; } catch { return u; } };
   const draw = () => {
