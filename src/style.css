@@ -598,3 +598,4 @@ code.cval { font-size: 12px; overflow-wrap: anywhere; }
   .crow.chead { display: none; }
   .cnest > .cparts { margin-left: 10px; }
 }
+.tfoot input { width: 100%; margin-top: 6px; }

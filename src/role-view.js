@@ -9,6 +9,7 @@ import { keyName, json } from './roles.js';
 import { explorerKey, explorerSource } from './reads.js';
 import { load, store } from './store.js';
 import * as labels from './labels.js';
+import { readAbi } from './abifile.js';
 
 // Standard interfaces, known without any lookup.
 const STANDARD = parseAbi([
@@ -17,25 +18,27 @@ const STANDARD = parseAbi([
   'deposit()', 'withdraw(uint256 amount)',
 ].join('\n'));
 const sel = (s) => String(s).toLowerCase().replace(/^0x/, '');
-const pastedKey = (chain, address) => 'abi:' + chain + ':' + address;
+const pastedKey = (chain, address) => 'abi:' + chain + ':' + address, nameKey = (chain, address) => 'abiname:' + chain + ':' + address;
+
 
 /** Names for a target: { name, source, fns: Map(selector → function) }. Your ABI, else Etherscan's, else standard ones. */
 async function namesFor(chain, address) {
   const fns = new Map(), add = (list) => list.forEach((f) => f.selector && !fns.has(f.selector) && fns.set(f.selector, f));
-  let name = null, source = null;
+  let name = load(nameKey(chain, address), '') || null, source = null, missing = null;
   const pasted = load(pastedKey(chain, address), '');
   if (pasted) { try { add(parseAbi(pasted)); source = 'your ABI'; } catch {} }
   if (explorerKey()) {
     try {
       const s = await explorerSource(explorerKey(), chain, address);
-      name = s.name;
+      name = name || s.name;
       if (s.abi) add(parseAbi(s.abi)), (source = source || 'Etherscan (verified source)');
-    } catch {}
+      else missing = 'Etherscan has no verified source for this contract.';
+    } catch (e) { missing = e.message; }
   }
   const before = fns.size;
   add(STANDARD);
   if (fns.size > before && !source) source = 'standard interfaces';
-  return { name, source, fns };
+  return { name, source, fns, missing };
 }
 
 // ---- conditions: a table of parameters, logical groups as labelled brackets ----
@@ -98,13 +101,30 @@ function targetView(t, ctx) {
   const clearance = ['Revoked', 'All functions', 'Scoped · ' + fns.length + ' function' + (fns.length === 1 ? '' : 's')][t.clearance];
   const draw = (names) => {
     put(body, t.clearance === 1 ? h('div.fn', h('div.fnhead', h('span', 'Every function of this contract'), chips(t.options))) : fns.length ? fns.map((fn) => fnView(fn, names && names.fns.get(sel(fn.selector)), t, ctx)) : h('p.mut', 'No functions configured.'));
-    if (names) put(title, names.name || unnamed()), title.classList.toggle('mut', !names.name && !labels.get(t.address)), put(note, names.source ? 'Names from ' + names.source + '. They are labels only: each one matches the selector that executes.' : 'No names for this contract. Add an Etherscan key in Settings, or paste its ABI.');
+    if (names) put(title, names.name || unnamed()), title.classList.toggle('mut', !names.name && !labels.get(t.address)), put(note, (names.source ? 'Names from ' + names.source + '. They are labels only: each one matches the selector that executes.' : 'No names for this contract. Add an Etherscan key in Settings, or upload or paste its ABI below.') + (names.missing ? ' ' + names.missing : ''));
   };
   draw(null);
   namesFor(ctx.chain, t.address).then(draw, () => {});
-  const abiIn = h('textarea', { placeholder: 'ABI JSON, or one function signature per line', rows: 3, spellcheck: 'false', value: load(pastedKey(ctx.chain, t.address), '') });
-  const save = h('button', { onclick: () => { store(pastedKey(ctx.chain, t.address), abiIn.value.trim()); namesFor(ctx.chain, t.address).then(draw, () => {}); } }, 'Save');
-  return h('section.tcard', h('div.thead', h('div.tid', title, addr(t.address, null, null, true)), h('span.chip' + (t.clearance === 0 ? '.warn' : ''), clearance)), body, h('div.tfoot', note, h('details', h('summary', 'Function names'), abiIn, h('div.actions', save))));
+  // Your ABI for this contract: uploaded (.json artifact or ABI) or pasted, and an optional contract name.
+  const abiIn = h('textarea', { placeholder: 'ABI JSON, a compiler artifact, or one function signature per line', rows: 3, spellcheck: 'false', value: load(pastedKey(ctx.chain, t.address), '') });
+  const nameIn = h('input', { placeholder: 'Contract name (optional)', value: load(nameKey(ctx.chain, t.address), ''), spellcheck: 'false', autocomplete: 'off' });
+  const err = h('div'), file = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
+  const apply = (text) => {
+    put(err);
+    try {
+      const { abi, name } = readAbi(text);
+      if (abi) parseAbi(abi); // refuse what cannot be parsed
+      store(pastedKey(ctx.chain, t.address), abi);
+      if (name && !nameIn.value.trim()) nameIn.value = name;
+      store(nameKey(ctx.chain, t.address), nameIn.value.trim());
+      abiIn.value = abi;
+      namesFor(ctx.chain, t.address).then(draw, () => {});
+    } catch (e) { put(err, warn('Could not read this ABI: ' + e.message)); }
+  };
+  file.onchange = () => file.files[0] && file.files[0].text().then(apply, (e) => put(err, warn(e.message)));
+  const save = h('button', { onclick: () => apply(abiIn.value) }, 'Save');
+  const upload = h('button', { onclick: () => file.click() }, 'Upload .json');
+  return h('section.tcard', h('div.thead', h('div.tid', title, addr(t.address, null, null, true)), h('span.chip' + (t.clearance === 0 ? '.warn' : ''), clearance)), body, h('div.tfoot', note, h('details', h('summary', 'Function names'), nameIn, abiIn, file, h('div.actions', upload, save), err)));
 }
 
 /** The role page: header, then Permissions and Members. */
