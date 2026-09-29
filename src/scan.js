@@ -36,13 +36,31 @@ async function codeBlock(request, address, latest, signal) {
   while (low < high) { cancelled(signal); const mid = Math.floor((low + high) / 2); if (await request('eth_getCode', [address, quantity(mid)]) === '0x') low = mid + 1; else high = mid; }
   return low;
 }
+// A modifier's deployment block never changes: once found, it is kept on its own (a reset or a new scan skips
+// the search). Only blocks found here are kept, never a start block typed by hand.
+const deployKey = (chain, address) => 'deploy:' + chain + ':' + address;
+export const knownDeployment = (chain, address) => { const b = load(deployKey(chain, address), null); return Number.isSafeInteger(b) && b >= 0 ? b : null; };
+// Reorgs only touch recent blocks: when the cached tip changed, the events older than this many blocks are kept.
+export const REORG_DEPTH = 1000;
+
 export async function scan(request, { address, chain, block, signal, progress = () => {}, start, budget = 24 }) {
   const key = 'scan:2:' + chain + ':' + address;
   let cache = load(key, null);
   if (cache && (!Array.isArray(cache.logs) || !Number.isSafeInteger(cache.last) || !Number.isSafeInteger(cache.start))) cache = null;
-  if (cache) { const header = await request('eth_getBlockByNumber', [quantity(cache.last), false]); if (header?.hash !== cache.hash || cache.last > block || start != null && Number(start) !== cache.start) cache = null; }
+  if (cache && (cache.last > block || start != null && Number(start) !== cache.start)) cache = null;
+  if (cache && cache.hash) {
+    const header = await request('eth_getBlockByNumber', [quantity(cache.last), false]);
+    if (header?.hash !== cache.hash) {
+      // The tip was reorged away: keep what is older than REORG_DEPTH blocks and rescan the rest.
+      const keep = cache.last - REORG_DEPTH;
+      if (keep >= cache.start) (cache.logs = cache.logs.filter((l) => Number(BigInt(l.blockNumber)) <= keep)), (cache.last = keep), (cache.hash = null);
+      else cache = null;
+    }
+  }
   if (!cache) {
-    const first = start == null ? await deploymentBlock(request, address, block, signal) : Number(start);
+    const known = start == null ? knownDeployment(chain, address) : null;
+    const first = start != null ? Number(start) : known != null && known <= block ? known : await deploymentBlock(request, address, block, signal);
+    if (start == null && first !== known) store(deployKey(chain, address), first);
     if (!Number.isSafeInteger(first) || first < 0 || first > block) throw Error('Start block must be between zero and the current block.');
     cache = { start: first, partial: start != null && first !== 0, last: first - 1, hash: null, logs: [] };
   }
