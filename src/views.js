@@ -52,9 +52,9 @@ export async function renderAddress(address, path, epoch) {
   const root = h('div', h('h1', 'Roles ' + info.version), addr(address), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), !ownerSupported&&warn('This owner is neither the connected wallet nor a readable Safe. You can inspect permissions and prepare calls, but roles.wei cannot submit them for this owner.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
   if (!info.supported) { root.append(h('p.mut', 'This implementation is identified but is not supported for permission decoding or editing.'), h('details', h('summary', 'Implementation'), addr(info.implementation), h('pre', info.code))); return root; }
   root.append(tabbar(address, path[0] === 'allowances' ? 'allowances' : 'roles'));
-  const status = h('p.mut', 'Preparing history scan…'), content = h('div'), out = h('div'), tip = h('div');
-  // While a scan runs block by block, point to the fast path: an Etherscan key loads it in a few requests.
-  const showTip = (on) => put(tip, on && !explorerKey() && h('div.tip', h('div', h('b', 'Loading slowly? '), 'With a free Etherscan API key this history loads in a few seconds instead of block by block.'), h('button.primary', { onclick: () => settingsDialog() }, 'Add an Etherscan key')));
+  const status = h('p.mut', 'Preparing history scan…'), content = h('div'), out = h('div');
+  // While a scan runs block by block, point to the fast path, inline: an Etherscan key loads it in a few requests.
+  const tip = () => !explorerKey() && !request.wide && [' · ', h('a.hint', { href: '#', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Add an Etherscan API key'), ' to load instantly instead of scanning block by block.'];
   const start = h('input', { 'aria-label': 'History start block', placeholder: 'Auto-detect deployment block', inputmode: 'numeric' });
   const go = h('button', 'Scan / resume'), pause = h('button', 'Pause');
   let controller, scanning = false;
@@ -68,10 +68,9 @@ export async function renderAddress(address, path, epoch) {
       const pct = p.block > p.start ? Math.floor((100 * (p.last - p.start + 1)) / (p.block - p.start + 1)) : 100;
       const rate = (p.last - b0) / (now - t0), left = rate > 0 ? (p.block - p.last) / rate : 0;
       const eta = now - t0 < 3000 || !(rate > 0) ? '' : left < 60000 ? ' · less than a minute left' : left < 3600000 ? ' · about ' + Math.round(left / 60000) + ' min left' : ' · about ' + Math.round(left / 3600000) + ' h left';
-      put(status, 'Scanning history · ' + pct + '% · ' + p.events + ' event' + (p.events === 1 ? '' : 's') + eta);
-      showTip(p.last < p.block && !request.wide);
+      put(status, 'Scanning history · ' + pct + '% · ' + p.events + ' event' + (p.events === 1 ? '' : 's') + eta, p.last < p.block && tip());
     };
-    put(status, 'Finding where this modifier’s history starts…'); showTip(!request.wide);
+    put(status, 'Finding where this modifier’s history starts…', tip());
     try {
       // The scan saves its progress every few windows; keep going until it catches up or is paused.
       let result;
@@ -84,10 +83,10 @@ export async function renderAddress(address, path, epoch) {
       put(status, (result.complete ? 'Complete history' : result.caughtUp ? 'Partial history — editing disabled' : 'Paused — resume scanning') + ' · blocks ' + result.start + '–' + result.last + (provider.source ? ' · read through ' + provider.source : ''));
       put(content, body(ctx, path));
     } catch (e) { if (epoch === session.epoch) put(out, warn(e.message + ' If an RPC cannot serve this history, add one for this chain in Settings (or set a start block in History options).')); }
-    finally { scanning = false; go.disabled = false; pause.disabled = true; showTip(false); }
+    finally { scanning = false; go.disabled = false; pause.disabled = true; }
   };
   pause.onclick = () => controller?.abort(); go.onclick = run;
-  root.append(status, tip, h('div.actions', go, pause, h('button.link', { onclick: () => { controller?.abort(); clearScan(chain, address); put(content); put(status, 'Cache cleared. Scan again.'); } }, 'Reset cache')), h('details', h('summary', 'History options'), h('label', 'Start block (leave empty for complete history)'), start), out, content);
+  root.append(status, h('div.actions', go, pause, h('button.link', { onclick: () => { controller?.abort(); clearScan(chain, address); put(content); put(status, 'Cache cleared. Scan again.'); } }, 'Reset cache')), h('details', h('summary', 'History options'), h('label', 'Start block (leave empty for complete history)'), start), out, content);
   run();
   return root;
 }
