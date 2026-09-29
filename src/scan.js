@@ -1,12 +1,12 @@
 import { load, store } from './store.js';
 import { quantity, decodeEvent, SETUP_TOPIC } from './roles.js';
-import { noHistory } from './history.js';
+import { noHistory, tooWide } from './reads.js';
 const cancelled = signal => { if (signal?.aborted) throw Error('Scan paused. Resume to continue.'); };
 // Most wallet RPCs are full nodes, not archives: past state (eth_getCode at an old block) is gone, logs are not.
-const tooWide = e => /range|limit|size|result|response|too many|too large/i.test(e?.message || '');
 
 /** The deployment block: by code at past blocks where the RPC keeps them, else by the setup event in the logs. */
 export async function deploymentBlock(request, address, latest, signal) {
+  if (request.wide) return setupBlock(request, address, latest, signal); // an indexer finds the setup event at once
   try { return await codeBlock(request, address, latest, signal); }
   catch (e) { if (!noHistory(e)) throw e; return setupBlock(request, address, latest, signal); }
 }
@@ -46,7 +46,7 @@ export async function scan(request, { address, chain, block, signal, progress = 
     if (!Number.isSafeInteger(first) || first < 0 || first > block) throw Error('Start block must be between zero and the current block.');
     cache = { start: first, partial: start != null && first !== 0, last: first - 1, hash: null, logs: [] };
   }
-  let window = 5000, windows = 0;
+  let window = request.wide ? block + 1 : 5000, windows = 0; // an indexer serves the whole range in one request
   while (cache.last < block && windows < budget) {
     cancelled(signal); const from = cache.last + 1, to = Math.min(block, from + window - 1);
     const before = await request('eth_getBlockByNumber', [quantity(to), false]);
