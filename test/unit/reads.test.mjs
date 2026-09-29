@@ -111,3 +111,15 @@ test('your RPC capping log ranges: those ranges go to WalletConnect’s RPC, eve
   assert.equal(await r.request({ method: 'eth_call', params: [{}] }), 'from https://capped.example/v2/key');
   globalThis.fetch = saved;
 });
+
+test('a request that never got through is tried again (twice), then reported plainly', async () => {
+  const saved = globalThis.fetch;
+  let n = 0;
+  globalThis.fetch = async () => { if (++n < 3) throw TypeError('Failed to fetch'); return { ok: true, json: async () => ({ jsonrpc: '2.0', id: 1, result: '0x1' }) }; };
+  const { jsonRpc } = await import('../../src/net.js');
+  assert.equal(await jsonRpc('https://x.example', 'eth_chainId'), '0x1');
+  assert.equal(n, 3);
+  globalThis.fetch = async () => { throw TypeError('Failed to fetch'); };
+  await assert.rejects(jsonRpc('https://x.example', 'eth_chainId'), /could not be reached \(Failed to fetch\)/);
+  globalThis.fetch = saved;
+});

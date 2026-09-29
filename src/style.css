@@ -518,3 +518,13 @@ p.wsec { margin: 18px 0 0; color: var(--mut); font-size: 13px; font-weight: 500;
 /* An inline suggestion in a muted line: bold, in color, clickable. */
 a.hint { color: var(--hint); font-weight: 700; text-decoration: none; }
 a.hint:hover { text-decoration: underline; }
+/* The scan's actions in one row; History options drops down from its toggle. */
+.actions.scanbar { align-items: center; }
+details.hopts { position: relative; margin: 0; border: 0; }
+details.hopts > summary { padding: 6px 4px; color: var(--mut); font-size: 14px; font-weight: 500; }
+details.hopts > summary:hover { color: var(--fg); }
+details.hopts .dropdown { left: 0; right: auto; min-width: 260px; gap: 6px; padding: 12px; }
+details.hopts .dropdown label { margin: 0; color: var(--mut); font-size: 13px; }
+details.hopts .dropdown p { margin: 0; }
+.scanstatus { margin: 12px 0; }
+.scanstatus p { margin: 0; }
