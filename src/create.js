@@ -19,7 +19,7 @@ async function receipt(request, hash) {
 }
 
 function createDialog(ctx) {
-  const {body}=sheet('shield','Create a Roles modifier',true),out=h('div'),review=h('div');
+  const {body}=sheet('people','Create a Roles modifier',true),out=h('div'),review=h('div');
   body.classList.add('fulladdr');
   const input=(label,value,attrs={})=>{const el=h('input',{value,'aria-label':label,spellcheck:'false',autocomplete:'off',...attrs});return {label:h('label',label),el};};
   const owner=input('Owner address',ctx.address),avatar=input('Avatar address',ctx.address),target=input('Target address',ctx.address),salt=input('Salt',randomSalt(),{inputmode:'numeric'}),gatewayInput=input('safe.wei gateway',load('gateway','https://safe.wei.limo/')),nonce=input('Safe nonce',null,{placeholder:'Current Safe nonce',inputmode:'numeric'});
@@ -48,7 +48,7 @@ function createDialog(ctx) {
 }
 
 function pendingDialog(ctx,x) {
-  const {body}=sheet('shield','Enable deployed modifier'),out=h('div');
+  const {body}=sheet('people','Enable deployed modifier'),out=h('div');
   const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:load('gateway','https://safe.wei.limo/')});
   const nonce=h('input',{'aria-label':'Safe nonce',placeholder:'Current Safe nonce',inputmode:'numeric'});
   const enable=h('button.primary','Prepare enablement link');

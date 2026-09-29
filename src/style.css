@@ -497,3 +497,16 @@ main h1 { font-size: 22px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Menlo, monospace; }
 nav.tabs a { color: var(--mut); text-decoration: none; padding: 9px 12px; border-bottom: 2px solid transparent; }
 nav.tabs a.on { color: var(--fg); border-color: var(--fg); }
+/* Wallet dialog: one full-width row per choice, the connected account on top. */
+.wlist { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0; }
+.wopt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); text-align: left; }
+.wopt:hover { border-color: var(--mut); }
+.wopt .wtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wopt .wtext .mut { font-size: 13px; font-weight: 400; }
+.wopt svg { flex: none; width: 16px; height: 16px; color: var(--mut); }
+.wacct { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; overflow-wrap: anywhere; }
+p.wsec { margin: 18px 0 0; color: var(--mut); font-size: 13px; font-weight: 500; }
+.actions.wfoot { margin-top: 18px; justify-content: flex-end; }
+.qrcode { display: flex; justify-content: center; margin: 12px 0; }
+.qrcode svg { width: min(300px, 100%); height: auto; border-radius: 8px; }
+.qracts { justify-content: center; }
