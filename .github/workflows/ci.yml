@@ -48,7 +48,7 @@ jobs:
           mkdir site && cp dist/index.html site/
           printf '/*\n  X-Frame-Options: DENY\n  Content-Security-Policy: frame-ancestors '"'"'none'"'"'\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n' > site/_headers
       - name: Create the Pages project if missing
-        run: npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main || true
+        run: npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main --force || true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
