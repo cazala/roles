@@ -1,4 +1,4 @@
-import { $, h, put, addr, bad, warn, act, sheet, copyButton, short, friendlyError, toClipboard } from './ui.js';
+import { $, h, put, addr, bad, warn, act, sheet, copyButton, short, friendlyError, toClipboard, infoLabel } from './ui.js';
 import * as labels from './labels.js';
 import { KNOWN_IDS, label } from './chains.js';
 import { parseAbi } from './abicoder.js';
@@ -11,7 +11,7 @@ import { isAddr, ZERO } from './abi.js';
 import { parseValue } from './abicoder.js';
 import { proposal, gateway } from './handoff.js';
 import { load, store } from './store.js';
-import { allowanceView } from './condition-view.js';
+import { allowancesView } from './allowances.js';
 export const drafts = new Map();
 export const editorHooks = {};
 const id = ctx => ctx.chain + ':' + ctx.address;
@@ -48,13 +48,14 @@ function suggest(input,list) {
 }
 /** Your labelled addresses as [address, label], leaving out `skip` (addresses already there). */
 const labelled=skip=>Object.entries(labels.all()).filter(([a])=>isAddr(a)&&!skip.includes(a));
+export { OPTIONS_HINT };
 export function form(title, fields, submit) {
   const {body,close}=sheet('edit',title,true), out=h('div'), controls={};
   for(const f of fields) {
     const input=f.options?h('select',{'aria-label':f.label},f.options.map(([value,text])=>h('option',{value},text))):h(f.multiline?'textarea':'input',{'aria-label':f.label,spellcheck:'false',autocomplete:'off'});
     if(f.value!=null)input.value=String(f.value);
     controls[f.key]=input;
-    body.append(h('label',f.label),f.suggest?suggest(input,f.suggest):input);
+    body.append(f.info?infoLabel(f.label,f.info):h('label',f.label),f.suggest?suggest(input,f.suggest):input);
     if (f.hint) body.append(h('p.fhint',f.hint));
   }
   const save=h('button.primary','Add to pending changes');save.onclick=act(save,async()=>{await submit(Object.fromEntries(Object.entries(controls).map(([k,v])=>[k,v.value])));close();},out);
@@ -65,7 +66,7 @@ const OPTIONS_HINT='CALL is a normal call. DELEGATECALL runs the target’s code
 const opOptions=[[0,'CALL, no ETH'],[1,'CALL with ETH'],[2,'CALL or DELEGATECALL, no ETH'],[3,'CALL or DELEGATECALL with ETH']];
 export function targetForm(ctx,key) {
   const have=Object.values(draft(ctx).value.roles[key]?.targets||{}).filter(t=>t.clearance).map(t=>t.address);
-  form('Add target',[{key:'address',label:'Target contract address',hint:'The contract this role may call.',suggest:()=>labelled(have)},{key:'mode',label:'Access',value:2,options:[[2,'Only functions I add'],[1,'Every function']]},{key:'options',label:'Execution options (every function)',value:0,options:opOptions,hint:OPTIONS_HINT}],v=>mutate(ctx,s=>{const a=checkAddress(v.address),t=target(s,key,a);if(t.clearance)throw Error('This role already has this target.');t.clearance=Number(v.mode);t.options=t.clearance===1?Number(v.options):0;}));
+  form('Add target',[{key:'address',label:'Target contract address',hint:'The contract this role may call.',suggest:()=>labelled(have)},{key:'mode',label:'Access',value:2,options:[[2,'Only functions I add'],[1,'Every function']]},{key:'options',label:'Execution options (every function)',value:0,options:opOptions,info:OPTIONS_HINT}],v=>mutate(ctx,s=>{const a=checkAddress(v.address),t=target(s,key,a);if(t.clearance)throw Error('This role already has this target.');t.clearance=Number(v.mode);t.options=t.clearance===1?Number(v.options):0;}));
 }
 /** Add a function to a scoped target: pick it from the contract's ABI (yours or Etherscan's), or type a signature or selector. */
 function addFunction(ctx,key,t,names) {
@@ -78,13 +79,13 @@ function addFunction(ctx,key,t,names) {
   search.oninput=draw;
   const sig=h('input',{placeholder:'transfer(address to, uint256 amount) or 0xa9059cbb',spellcheck:'false',autocomplete:'off','aria-label':'Function signature or selector'}),byHand=h('button','Add');
   byHand.onclick=act(byHand,async()=>{const text=sig.value.trim();if(!text)throw Error('Enter a signature or a selector.');const f=/^0x[0-9a-fA-F]{8}$/.test(text)?null:parseAbi(text)[0];add(selector(text),false,f);},out);
-  put(body,h('label','Execution options'),options,h('p.fhint',OPTIONS_HINT),
+  put(body,infoLabel('Execution options',OPTIONS_HINT),options,
     names?.abi.length?[h('label','From the contract’s ABI'),fns.length>6&&search,rows]:h('p.mut.small','No ABI for this contract: type the function, or add its ABI from the target’s ⋯ menu to pick from a list.'),
     h('label','Or type a signature or selector'),h('div.row',sig,byHand),out);
   if(names?.abi.length)draw();
   (fns.length>6?search:sig).focus();
 }
-function optionsForm(title,value,save){form(title,[{key:'options',label:'Execution options',value,options:opOptions,hint:OPTIONS_HINT}],v=>save(Number(v.options)));}
+function optionsForm(title,value,save){form(title,[{key:'options',label:'Execution options',value,options:opOptions,info:OPTIONS_HINT}],v=>save(Number(v.options)));}
 /** The actions on a role page's cards, functions and members; role-view.js calls them from the ⋯ menus. */
 function edits(ctx,key) {
   const base=()=>draft(ctx).base.roles[key];
@@ -106,10 +107,6 @@ function edits(ctx,key) {
     restoreMember:a=>mutate(ctx,s=>{role(s,key).members[a]=true;}),
     makeDefault:a=>mutate(ctx,s=>{s.defaults[a]=key;}),
   };
-}
-function allowanceForm(ctx,key='') {
-  const a=draft(ctx).value.allowances[key]||{};
-  form('Set allowance',[{key:'key',label:'Allowance name or bytes32 key',value:key?keyName(key):''},...['balance','maxRefill','refill','period','timestamp'].map(k=>({key:k,label:({balance:'Balance (base units)',maxRefill:'Maximum refill balance',refill:'Refill amount',period:'Period (seconds)',timestamp:'Last refill timestamp'})[k],value:a[k]??0,hint:k==='maxRefill'?'Zero means unlimited refill ceiling.':k==='timestamp'?'Zero uses the execution block timestamp.':k==='period'?'Zero creates a one-time allowance.':null}))],v=>mutate(ctx,s=>{const key=roleKey(v.key),a={allowanceKey:key};for(const k of ['balance','maxRefill','refill','period','timestamp'])a[k]=parseValue({type:k==='period'||k==='timestamp'?'uint64':'uint128'},v[k]);s.allowances[key]=a;}));
 }
 function settings(ctx) {
   const d=draft(ctx);
@@ -241,7 +238,7 @@ export function editBody(ctx,path) {
     if(path[0]==='role') {
       const key=path[1],member=d.value.roles[key]?.members[session.account]&&d.value.enabled[session.account];
       put(root,toolbar,roleView({...stateCtx,edit:edits(ctx,key),roleActions:member&&editorHooks.use&&h('button.primary.sm',{onclick:()=>editorHooks.use(ctx,key)},'Use this role')},key));
-    } else if(path[0]==='allowances')put(root,toolbar,allowanceView(stateCtx),h('button',{onclick:()=>allowanceForm(ctx)},'Set allowance'),Object.keys(d.value.allowances).map(key=>h('div.actions',h('button.link',{onclick:()=>allowanceForm(ctx,key)},'Edit '+keyName(key)))));
+    } else if(path[0]==='allowances')put(root,toolbar,allowancesView({...stateCtx,edit:{set:(k,v)=>mutate(ctx,s=>{s.allowances[k]=v;})}}));
     else {const roles=Object.values(d.value.roles);put(root,toolbar,h('h2','Roles'),roles.length?h('div.slist',roles.map(r=>h('a.srow',{href:'#/'+ctx.address+'/role/'+r.key},h('b',keyName(r.key)),h('span.mut',Object.values(r.members).filter(Boolean).length+' members · '+Object.values(r.targets).filter(t=>t.clearance).length+' targets')))):h('p.empty','No roles configured yet. Choose New role to start.'),h('div.actions',h('button',{onclick:()=>form('New role',[{key:'key',label:'Role name or bytes32 key'}],v=>{const key=roleKey(v.key);mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;})},'New role')),h('details',h('summary','Modifier settings'),h('div.actions',h('button',{onclick:()=>settings(ctx)},'Owner, avatar and target'),h('button',{onclick:()=>unwrapForm(ctx)},'Transaction unwrapper'))));}
   };
   ctx.redraw(); return root;

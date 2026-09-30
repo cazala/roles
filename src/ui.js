@@ -297,3 +297,12 @@ export function menu(items, label = 'Actions') {
 const closeMenus = () => document.querySelectorAll('.kmenu').forEach((m) => (m.hidden = true));
 document.addEventListener('pointerdown', (e) => !e.target.closest('.kebab') && closeMenus());
 document.addEventListener('keydown', (e) => e.key === 'Escape' && closeMenus());
+
+/** A label with an ⓘ that opens a short explanation under it (click again, or anywhere else, to close). */
+export function infoLabel(text, tip) {
+  const pop = h('span.infotip', { role: 'note', hidden: true }, tip);
+  const b = h('button.info', { type: 'button', title: 'What is this?', 'aria-label': 'What is ' + text + '?', 'aria-expanded': 'false' }, 'i');
+  b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const open = pop.hidden; document.querySelectorAll('.infotip').forEach((p) => (p.hidden = true)); pop.hidden = !open; b.setAttribute('aria-expanded', String(open)); };
+  return h('label.infol', text, b, pop);
+}
+document.addEventListener('pointerdown', (e) => !e.target.closest('.infol') && document.querySelectorAll('.infotip').forEach((p) => (p.hidden = true)));

@@ -2,14 +2,15 @@ import { editBody, editorHooks } from './edit.js';
 import { createView } from './create.js';
 import { useRole } from './use.js';
 import { editConditions } from './condition-edit.js';
-import { conditionView, allowanceView } from './condition-view.js';
+import { conditionView } from './condition-view.js';
+import { allowancesView } from './allowances.js';
 import { h, put, addr, bad, warn, act, short, icon } from './ui.js';
 import { session, route, settingsDialog } from './app.js';
 import { explorerKey } from './reads.js';
 import { identify, metadata, safeModules, replay, keyName, json, quantity } from './roles.js';
 import { scan, clearScan } from './scan.js';
 
-export const hooks = { conditions: conditionView, allowances: allowanceView, body: editBody, create: createView };
+export const hooks = { conditions: conditionView, allowances: allowancesView, body: editBody, create: createView };
 editorHooks.use = useRole;
 editorHooks.conditions = editConditions;
 export const tabbar = (address, active) => h('nav.tabs', ['roles', 'allowances'].map(name => h('a' + (name === active ? '.on' : ''), { href: '#/' + address + (name === 'roles' ? '' : '/' + name) }, name[0].toUpperCase() + name.slice(1))));

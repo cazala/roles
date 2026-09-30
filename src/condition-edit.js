@@ -1,8 +1,8 @@
-import { h, put, act, sheet, warn } from './ui.js';
+import { h, put, act, sheet, warn, infoLabel } from './ui.js';
 import { parseAbi } from './abicoder.js';
 import { buildConditions, conditionFields, readConditions } from './condition-builder.js';
 import { words } from './conditions.js';
-import { mutate, draft } from './edit.js';
+import { mutate, draft, OPTIONS_HINT } from './edit.js';
 import { target } from './roles.js';
 import { isAddr, ZERO } from './abi.js';
 import { parseUnits, formatUnits } from './units.js';
@@ -100,7 +100,7 @@ export function editConditions(ctx,key,pre={}) {
       if(!(stored&&JSON.stringify(stored.conditions)===JSON.stringify(flat)&&stored.options===opt))mutate(ctx,s=>{const t=target(s,key,a);if(t.clearance!==2){t.clearance=2;t.options=0;}t.functions[sel]={selector:sel,options:opt,conditions:flat};});
       close();
     },out);
-    put(editor,functions.length>1&&[h('label','Function'),fn],note,h('label','Execution options'),options,rows,allow,h('div.actions',add),out);
+    put(editor,functions.length>1&&[h('label','Function'),fn],note,infoLabel('Execution options',OPTIONS_HINT),options,rows,allow,h('div.actions',add),out);
   },out);
   if(pre.address)address.value=pre.address;
   if(pre.fn){put(body,h('p.mut.small','Conditions for ',h('code',pre.fn.sig),'.'),editor,out);load.onclick();return;}
