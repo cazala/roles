@@ -549,16 +549,15 @@ details.edetail pre { max-height: 180px; overflow: auto; font-size: 11px; white-
 .role h2 { margin-bottom: 4px; }
 p.rkey { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; overflow-wrap: anywhere; }
 nav.rtabs { margin-bottom: 14px; }
-.tcard { margin: 0 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; }
+.tcard { margin: 0 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 .thead { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .tid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .tname { font-size: 15px; }
 .tid .addr code { font-size: 12px; color: var(--mut); overflow-wrap: anywhere; }
 .tbody { display: flex; flex-direction: column; }
-.tfoot { padding: 8px 14px 12px; border-top: 1px solid var(--line); }
-.tfoot p { margin: 0 0 4px; }
-.tfoot details { margin: 0; border: 0; }
-.tfoot textarea { width: 100%; margin-top: 6px; font-family: ui-monospace, monospace; font-size: 12px; }
+.tfoot { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 8px 14px; border-top: 1px solid var(--line); }
+.tfoot .grow { flex: 1; }
+.tnote { text-align: right; }
 .fn { padding: 12px 14px; }
 .fn + .fn { border-top: 1px solid var(--line); }
 .fnhead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -589,7 +588,6 @@ code.cval { font-size: 12px; overflow-wrap: anywhere; }
   .crow.chead { display: none; }
   .cnest > .cparts { margin-left: 10px; }
 }
-.tfoot input { width: 100%; margin-top: 6px; }
 .aname:not(:empty) { margin-left: 6px; font-size: 12px; }
 #connect .who { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The create wizard: a step bar, one step at a time, Back / Next in the footer. */
@@ -624,3 +622,81 @@ ol.wprogress { margin: 0; padding-left: 20px; display: flex; flex-direction: col
 .wdone { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--ok); border-radius: 12px; }
 .wdone p { margin: 0; }
 @media (max-width: 600px) { ol.wsteps li { font-size: 0; gap: 0; } ol.wsteps li.on { font-size: 13px; gap: 6px; } }
+/* The editor, in place: ⋯ menus on cards, functions and members; draft changes marked where they are. */
+.kebab { position: relative; flex: none; }
+.kmenu { min-width: 210px; }
+.dropdown button.danger { color: var(--bad); }
+button.sm { padding: 5px 10px; font-size: 13px; border-radius: 6px; }
+.rhead { display: flex; align-items: center; gap: 10px; }
+.rhead h2 { margin: 0; overflow-wrap: anywhere; }
+nav.rtabs { align-items: center; overflow: visible; }
+nav.rtabs .grow { flex: 1; }
+.fnhead .grow, .thead .grow { flex: 1; }
+.fnhead .kebab { margin: -4px -6px -4px 0; }
+.thead .kebab { margin-right: -6px; }
+.chip.draft { color: #c98a00; border-color: #c98a00; }
+.tcard.pend { border-color: #c98a00; }
+.fn.pend { box-shadow: inset 3px 0 0 #c98a00; }
+.srow.pend { box-shadow: inset 3px 0 0 #c98a00; }
+.gone code.sig, .gone .tname, .gone .tid code, .srow.gone .addr code { text-decoration: line-through; color: var(--mut); }
+.tcard.gone { border-style: dashed; background: none; }
+.tcard.gone .thead { border-bottom: 0; }
+button.link.addfn { padding: 0; font-size: 13px; }
+.draftbar { position: sticky; top: 8px; z-index: 5; display: flex; align-items: center; gap: 14px; margin: 0 0 14px; padding: 8px 10px 8px 14px; border: 1px solid #c98a00; border-radius: 10px; background: var(--warnbg); font-size: 14px; font-weight: 500; }
+.draftbar .grow, .dbody .actions .grow { flex: 1; }
+.draftbar button.link { font-size: 13px; }
+.fpick { max-height: 320px; overflow-y: auto; margin-top: 8px; }
+.fpick code.sig { min-width: 0; overflow-wrap: break-word; }
+.fpick button { flex: none; white-space: nowrap; }
+@media (max-width: 600px) { .draftbar { gap: 10px; padding-left: 12px; font-size: 13px; } .draftbar button.primary { white-space: nowrap; } }
+/* Condition editor: one card per parameter, label / condition / value spaced; amounts with a unit. */
+.cfields { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.panel.cfield { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.cfield b .mut { font-weight: 400; }
+.amount .row { gap: 8px; }
+.amount .row input { flex: 1; min-width: 0; }
+select.unit { flex: none; width: auto; max-width: 48%; }
+.amount .fhint { margin: 6px 0 0; }
+.amount .fhint:empty { display: none; }
+pre.exact { max-height: 360px; overflow: auto; font-size: 12px; }
+/* Address suggestions (your labels) under an address input. */
+.combo { position: relative; }
+.combo > input { width: 100%; }
+.suggest { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; max-height: 232px; overflow-y: auto; display: flex; flex-direction: column; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
+.suggest[hidden] { display: none; }
+button.sopt { display: flex; align-items: baseline; gap: 10px; padding: 8px 10px; border: 0; border-radius: 6px; background: none; text-align: left; color: var(--fg); }
+button.sopt b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+button.sopt code { flex: none; color: var(--mut); font-size: 12px; }
+button.sopt:hover, button.sopt.on { background: var(--bg); }
+.suggest p { margin: 4px 10px 6px; }
+.dbody { overflow: visible; }
+.fhint.picked:empty { display: none; } .fhint.picked { margin: 6px 0 0; }
+/* Review changes: the modifier and its chain, one per line. */
+.rvhead { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; }
+.rvhead > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rvhead > div > .mut { flex: none; width: 64px; font-size: 13px; }
+.rvhead .addr { min-width: 0; overflow-wrap: anywhere; }
+/* Review changes: numbered call cards (as the role viewer's target cards), parameters read by type. */
+.rvnote { margin: 0 0 10px; }
+.rvcalls { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 14px; }
+.rvcall { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; }
+.rvtop { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.rvtop b { flex: 1; min-width: 0; font-size: 14px; }
+.rvnum { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 50%; color: var(--mut); font-size: 12px; font-weight: 600; }
+table.rvargs { margin: 8px 14px; width: calc(100% - 28px); font-size: 13px; }
+table.rvargs th { padding-right: 14px; font-weight: 400; font-family: ui-monospace, monospace; font-size: 12px; }
+table.rvargs td code { font-size: 12px; }
+details.rvraw { margin: 0; padding: 0 14px; border: 0; border-top: 1px solid var(--line); }
+details.rvraw > summary { padding: 8px 0; font-size: 12px; color: var(--mut); }
+details.rvraw[open] { padding-bottom: 10px; }
+details.rvraw code.sig { display: block; margin-bottom: 6px; font-size: 12px; }
+details.rvraw pre, details.rvconds pre { margin: 0; max-height: 180px; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+details.rvconds { margin: 0; border: 0; }
+details.rvconds > summary { padding: 0; font-size: 13px; }
+.rvfoot { flex-wrap: wrap; }
+/* The review's one row of actions: same height and spacing whether a link or a button. */
+.rvfoot { gap: 8px; margin: 14px 0 0; }
+.rvfoot > button, .rvfoot > a.btn { box-sizing: border-box; display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 6px; font-size: 14px; line-height: 1; }
+.rvfoot > a.btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.rvwait { display: inline-flex; align-items: center; gap: 8px; margin-right: 6px; color: var(--mut); font-size: 13px; }
+p.rvsend { margin: 8px 0 0; }

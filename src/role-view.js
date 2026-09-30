@@ -2,7 +2,7 @@
 // and Members. Function and parameter names are display only: an ABI entry is used for a function only when it
 // hashes to that function's selector, which is what executes. Values are decoded by the ABI type when known,
 // and otherwise shown exactly as encoded.
-import { h, put, addr, warn, copy } from './ui.js';
+import { h, put, addr, warn, copy, menu, sheet, toClipboard, copyButton } from './ui.js';
 import { parseAbi } from './abicoder.js';
 import { toTree, TYPES } from './conditions.js';
 import { keyName, json } from './roles.js';
@@ -24,21 +24,22 @@ const pastedKey = (chain, address) => 'abi:' + chain + ':' + address, nameKey = 
 /** Names for a target: { name, source, fns: Map(selector → function) }. Your ABI, else Etherscan's, else standard ones. */
 async function namesFor(chain, address) {
   const fns = new Map(), add = (list) => list.forEach((f) => f.selector && !fns.has(f.selector) && fns.set(f.selector, f));
-  let name = load(nameKey(chain, address), '') || null, source = null, missing = null;
+  let name = load(nameKey(chain, address), '') || null, source = null, missing = null, explorer = false;
   const pasted = load(pastedKey(chain, address), '');
   if (pasted) { try { add(parseAbi(pasted)); source = 'your ABI'; } catch {} }
   if (explorerKey()) {
     try {
       const s = await explorerSource(explorerKey(), chain, address);
       name = name || s.name;
-      if (s.abi) add(parseAbi(s.abi)), (source = source || 'Etherscan (verified source)');
+      if (s.abi) add(parseAbi(s.abi)), (source = source || 'Etherscan (verified source)'), (explorer = true);
       else missing = 'Etherscan has no verified source for this contract.';
     } catch (e) { missing = e.message; }
   }
+  const abi = [...fns.values()]; // from a real ABI (yours or Etherscan's): what Add function offers
   const before = fns.size;
   add(STANDARD);
   if (fns.size > before && !source) source = 'standard interfaces';
-  return { name, source, fns, missing };
+  return { name, source, fns, abi, missing, explorer, pasted: !!pasted };
 }
 
 // An address with its contract name next to it, muted, when an Etherscan key is set and the contract is
@@ -91,62 +92,122 @@ function node(n, p, ctx) {
 export function conditionTable(flat, f, ctx) {
   try {
     const root = toTree(flat);
-    return h('div.ctable', h('div.crow.chead', h('span', 'Parameter'), h('span', 'Type'), h('span', 'Condition'), h('span', 'Value')), node(root, { inputs: f ? f.inputs : null, name: 'Call data' }, ctx), h('details', h('summary', 'Exact conditions'), h('pre', json(flat))));
+    return h('div.ctable', h('div.crow.chead', h('span', 'Parameter'), h('span', 'Type'), h('span', 'Condition'), h('span', 'Value')), node(root, { inputs: f ? f.inputs : null, name: 'Call data' }, ctx));
   } catch (e) {
     return h('div', warn(e.message), h('pre', json(flat)));
   }
 }
 
 // ---- targets and functions ----
+// With `ctx.edit` (the editor), every card, function and member carries its own actions, and what the draft
+// changes is marked on the thing itself against `ctx.base`: new, changed, or revoked (struck, with Restore).
 const chips = (options) => [(options & 1) === 1 && h('span.chip.warn', 'Can send ETH'), (options & 2) === 2 && h('span.chip.bad', 'Delegatecall')];
 const signature = (f, s) => f ? h('code.sig', h('b', f.name), '(' + f.inputs.map((i) => i.type + (i.name ? ' ' + i.name : '')).join(', ') + ')') : h('code.sig', h('b', 'Function'), ' 0x' + s);
-function fnView(fn, f, t, ctx) {
-  const s = sel(fn.selector);
-  return h('div.fn', h('div.fnhead', signature(f, s), h('span.chip.mono', '0x' + s), chips(fn.options)), t.clearance !== 2 && warn('Dormant: the target allows all functions, or is revoked.'), fn.conditions ? conditionTable(fn.conditions, f, ctx) : h('p.mut.fnfree', 'Any parameters.'));
+const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+const mark = (was, now) => !was ? 'new' : !now ? 'gone' : same(was, now) ? null : 'changed';
+const markChip = (m) => m === 'new' ? h('span.chip.draft', 'New') : m === 'changed' ? h('span.chip.draft', 'Changed') : m === 'gone' ? h('span.chip.draft', 'Revoked in draft') : null;
+function fnView(fn, f, t, ctx, m) {
+  const s = sel(fn.selector), ed = ctx.edit;
+  const actions = m === 'gone'
+    ? h('button.link', { onclick: () => ed.restoreFn(t, fn) }, 'Restore')
+    : menu(() => [
+      ed && ['Edit conditions', () => ed.conditions(t, fn, f)],
+      ed && fn.conditions && ['Allow any parameters', () => ed.allowAny(t, fn)],
+      ed && ['Execution options…', () => ed.fnOptions(t, fn)],
+      fn.conditions && ['Exact conditions', () => exact(fn, f, s)],
+      ['Copy selector', () => toClipboard('0x' + s).catch(() => {})],
+      ed && ['Revoke function', () => ed.revokeFn(t, fn), true],
+    ], 'Function actions');
+  return h('div.fn' + (m ? '.pend' : '') + (m === 'gone' ? '.gone' : ''), h('div.fnhead', signature(f, s), h('span.chip.mono', '0x' + s), chips(fn.options), markChip(m), h('span.grow'), actions),
+    m !== 'gone' && [t.clearance !== 2 && warn('Dormant: the target allows all functions, or is revoked.'), fn.conditions ? conditionTable(fn.conditions, f, ctx) : h('p.mut.fnfree', 'Any parameters.')]);
 }
-function targetView(t, ctx) {
-  const fns = Object.values(t.functions), unnamed = () => labels.get(t.address) || 'Unnamed contract', title = h('b.tname' + (labels.get(t.address) ? '' : '.mut'), unnamed()), body = h('div.tbody'), note = h('p.mut.small');
-  const clearance = ['Revoked', 'All functions', 'Scoped · ' + fns.length + ' function' + (fns.length === 1 ? '' : 's')][t.clearance];
-  const draw = (names) => {
-    put(body, t.clearance === 1 ? h('div.fn', h('div.fnhead', h('span', 'Every function of this contract'), chips(t.options))) : fns.length ? fns.map((fn) => fnView(fn, names && names.fns.get(sel(fn.selector)), t, ctx)) : h('p.mut', 'No functions configured.'));
-    if (names) put(title, names.name || unnamed()), title.classList.toggle('mut', !names.name && !labels.get(t.address)), put(note, (names.source ? 'Names from ' + names.source + '. They are labels only: each one matches the selector that executes.' : 'No names for this contract. Add an Etherscan key in Settings, or upload or paste its ABI below.') + (names.missing ? ' ' + names.missing : ''));
-  };
-  draw(null);
-  namesFor(ctx.chain, t.address).then(draw, () => {});
-  // Your ABI for this contract: uploaded (.json artifact or ABI) or pasted, and an optional contract name.
-  const abiIn = h('textarea', { placeholder: 'ABI JSON, a compiler artifact, or one function signature per line', rows: 3, spellcheck: 'false', value: load(pastedKey(ctx.chain, t.address), '') });
-  const nameIn = h('input', { placeholder: 'Contract name (optional)', value: load(nameKey(ctx.chain, t.address), ''), spellcheck: 'false', autocomplete: 'off' });
+/** The conditions exactly as stored onchain (the flat list the contract checks), to read or copy. */
+function exact(fn, f, s) {
+  const { body } = sheet('edit', 'Exact conditions', true), text = json(fn.conditions);
+  put(body, h('p.mut.small', 'The conditions as the contract stores them for ', h('code', f ? f.sig : '0x' + s), ': a flat list where each entry names its parent. This is what executes; the table is a reading of it.'), h('pre.exact', text), h('div.actions', copyButton('Copy', text)));
+}
+/** Your ABI for a contract: upload a .json (an ABI or a compiler artifact) or paste one, with an optional name. */
+function abiDialog(ctx, address, done) {
+  const { body, close } = sheet('edit', 'Contract ABI', true);
+  const had = load(pastedKey(ctx.chain, address), '');
+  const abiIn = h('textarea', { placeholder: 'ABI JSON, a compiler artifact, or one function signature per line', rows: 8, spellcheck: 'false', value: had });
+  const nameIn = h('input', { placeholder: 'Contract name (optional)', value: load(nameKey(ctx.chain, address), ''), spellcheck: 'false', autocomplete: 'off' });
   const err = h('div'), file = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
-  const apply = (text) => {
+  const save = (text) => {
     put(err);
     try {
       const { abi, name } = readAbi(text);
       if (abi) parseAbi(abi); // refuse what cannot be parsed
-      store(pastedKey(ctx.chain, t.address), abi);
-      if (name && !nameIn.value.trim()) nameIn.value = name;
-      store(nameKey(ctx.chain, t.address), nameIn.value.trim());
-      abiIn.value = abi;
-      namesFor(ctx.chain, t.address).then(draw, () => {});
+      store(pastedKey(ctx.chain, address), abi);
+      store(nameKey(ctx.chain, address), nameIn.value.trim() || name || '');
+      close(); done();
     } catch (e) { put(err, warn('Could not read this ABI: ' + e.message)); }
   };
-  file.onchange = () => file.files[0] && file.files[0].text().then(apply, (e) => put(err, warn(e.message)));
-  const save = h('button', { onclick: () => apply(abiIn.value) }, 'Save');
-  const upload = h('button', { onclick: () => file.click() }, 'Upload .json');
-  return h('section.tcard', h('div.thead', h('div.tid', title, addr(t.address, null, null, true)), h('span.chip' + (t.clearance === 0 ? '.warn' : ''), clearance)), body, h('div.tfoot', note, h('details', h('summary', 'Function names'), nameIn, abiIn, file, h('div.actions', upload, save), err)));
+  file.onchange = () => file.files[0] && file.files[0].text().then(save, (e) => put(err, warn(e.message)));
+  put(body,
+    h('p.mut.small', 'The ABI names this contract’s functions and types their parameters, so you can pick functions and enter values by type. It is a label: what executes is the selector, and a name is shown only when it hashes to that selector. Kept in this browser.'),
+    h('label', 'Contract name'), nameIn, h('label', 'ABI'), abiIn, file, err,
+    h('div.actions', h('button', { onclick: () => file.click() }, 'Upload .json'), had && h('button.link', { onclick: () => (store(pastedKey(ctx.chain, address), ''), store(nameKey(ctx.chain, address), ''), close(), done()) }, 'Remove'), h('span.grow'), h('button', { onclick: close }, 'Cancel'), h('button.primary', { onclick: () => save(abiIn.value) }, 'Save')));
+  abiIn.focus();
+}
+function targetView(t, ctx, key) {
+  const ed = ctx.edit, was = ed && ctx.base?.roles[key]?.targets[t.address];
+  const m = ed ? (t.clearance === 0 ? 'gone' : !was || was.clearance === 0 ? 'new' : was.clearance !== t.clearance || was.options !== t.options ? 'changed' : null) : null;
+  const fns = Object.values(t.functions), unnamed = () => labels.get(t.address) || 'Unnamed contract', title = h('b.tname' + (labels.get(t.address) ? '' : '.mut'), unnamed()), body = h('div.tbody'), note = h('span.mut.small.tnote');
+  // Functions the draft revoked, still shown (struck) so they can be restored.
+  // In the editor, functions keep their places: the base's order (revoked ones struck), then the new ones.
+  const order = ed && was && was.clearance && m !== 'gone' ? [...new Set([...Object.keys(was.functions), ...Object.keys(t.functions)])] : Object.keys(t.functions);
+  const clearance = ['Revoked', 'All functions', 'Scoped · ' + fns.length + ' function' + (fns.length === 1 ? '' : 's')][t.clearance];
+  let names = null;
+  const draw = (n) => {
+    names = n;
+    const fnMark = (fn) => ed && was && was.clearance ? mark(was.functions[fn.selector], fn) : ed ? 'new' : null;
+    put(body, m === 'gone' ? null : t.clearance === 1 ? h('div.fn', h('div.fnhead', h('span', 'Every function of this contract'), chips(t.options))) : order.length ? order.map((k) => { const fn = t.functions[k] || was.functions[k]; return fnView(fn, n && n.fns.get(sel(k)), t, ctx, t.functions[k] ? fnMark(fn) : 'gone'); }) : h('p.mut.fnfree.fn', 'No functions configured.'));
+    if (n) put(title, n.name || unnamed()), title.classList.toggle('mut', !n.name && !labels.get(t.address));
+    put(note, n && n.source ? h('span', { title: 'Names are labels only: each one matches the selector that executes.' }, 'Names from ' + n.source) : n ? ['No ABI for this contract. ', h('button.link', { onclick: openAbi }, 'Add contract ABI')] : null);
+  };
+  const reload = () => namesFor(ctx.chain, t.address).then(draw, () => {});
+  const openAbi = () => abiDialog(ctx, t.address, reload);
+  draw(null);
+  reload();
+  const actions = m === 'gone' ? h('button.link', { onclick: () => ed.restoreTarget(t) }, 'Restore') : menu(() => [
+    ed && t.clearance === 2 && ['Add function', () => ed.addFunction(t, names)],
+    ed && t.clearance === 2 && ['Allow all functions…', () => ed.allowAll(t)],
+    ed && t.clearance === 1 && ['Execution options…', () => ed.allowAll(t)],
+    ed && t.clearance === 1 && ['Only configured functions', () => ed.scope(t)],
+    !(names && names.explorer && !names.pasted) && [(names && names.pasted ? 'Replace' : 'Add') + ' contract ABI…', openAbi],
+    ['Copy address', () => toClipboard(t.address).catch(() => {})],
+    ed && ['Revoke target', () => ed.revokeTarget(t), true],
+  ], 'Target actions');
+  const foot = h('div.tfoot', ed && t.clearance === 2 && h('button.link.addfn', { onclick: () => ed.addFunction(t, names) }, '+ Add function'), h('span.grow'), note);
+  return h('section.tcard' + (m ? '.pend' : '') + (m === 'gone' ? '.gone' : ''), h('div.thead', h('div.tid', title, addr(t.address, null, null, true)), markChip(m), m !== 'gone' && h('span.chip' + (t.clearance === 0 ? '.warn' : ''), clearance), actions), body, m !== 'gone' && foot);
 }
 
 /** The role page: header, then Permissions and Members. */
+let shown = { key: null, tab: 'permissions' }; // the open tab survives redraws of the same role
 export function roleView(ctx, key) {
-  const role = ctx.state.roles[key];
+  const role = ctx.state.roles[key], ed = ctx.edit, base = ctx.base?.roles[key];
   if (!role) return h('p.mut', 'No role with this key was found in the scanned history.');
+  if (shown.key !== key) shown = { key, tab: 'permissions' };
   const members = Object.entries(role.members).filter(([, yes]) => yes).map(([a]) => a), targets = Object.values(role.targets).filter((t) => t.clearance);
+  // In the editor, also what the draft removed, so it can be restored.
+  const goneMembers = ed && base ? Object.entries(base.members).filter(([a, yes]) => yes && !role.members[a]).map(([a]) => a) : [];
+  const shownTargets = Object.values(role.targets).filter((t) => t.clearance || (ed && base?.targets[t.address]?.clearance)); // in place, revoked ones too
   const content = h('div'), tabs = h('nav.tabs.rtabs');
-  const show = (which) => {
-    put(tabs, [['permissions', 'Permissions · ' + targets.length], ['members', 'Members · ' + members.length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)));
-    put(content, which === 'members'
-      ? members.length ? h('div.slist', members.map((a) => h('div.srow', named(ctx.chain, a), !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'), ctx.state.defaults[a] === key && h('span.chip', 'Default role')))) : h('p.empty', 'No members assigned.')
-      : targets.length ? targets.map((t) => targetView(t, ctx)) : h('p.empty', 'No targets configured for this role.'));
+  const memberRow = (a, gone) => {
+    const isNew = ed && !gone && !base?.members[a];
+    const def = ctx.state.defaults[a] === key;
+    return h('div.srow' + (gone || isNew ? '.pend' : '') + (gone ? '.gone' : ''), named(ctx.chain, a), !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'), def && h('span.chip', 'Default role'), isNew && h('span.chip.draft', 'New'), gone && h('span.chip.draft', 'Removed in draft'), h('span.grow'),
+      ed && (gone ? h('button.link', { onclick: () => ed.restoreMember(a) }, 'Restore') : menu(() => [!def && ['Make this their default role', () => ed.makeDefault(a)], ['Copy address', () => toClipboard(a).catch(() => {})], ['Remove member', () => ed.removeMember(a), true]], 'Member actions')));
   };
-  show('permissions');
-  return h('div.role', h('h2', keyName(key)), h('p.mut.rkey', h('code', key), copy(key, 'Copy role key')), tabs, content);
+  const show = (which) => {
+    shown.tab = which;
+    put(tabs, [['permissions', 'Permissions · ' + targets.length], ['members', 'Members · ' + members.length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)), h('span.grow'),
+      ed && (which === 'members' ? h('button.sm', { onclick: ed.addMember }, '+ Add member') : h('button.sm', { onclick: ed.addTarget }, '+ Add target')));
+    put(content, which === 'members'
+      ? members.length || goneMembers.length ? h('div.slist', members.map((a) => memberRow(a, false)), goneMembers.map((a) => memberRow(a, true))) : h('p.empty', 'No members assigned.')
+      : shownTargets.length ? shownTargets.map((t) => targetView(t, ctx, key)) : h('p.empty', 'No targets configured for this role.'));
+  };
+  show(shown.tab);
+  return h('div.role', h('div.rhead', h('h2', keyName(key)), h('span.grow'), ctx.roleActions), h('p.mut.rkey', h('code', key), copy(key, 'Copy role key')), tabs, content);
 }
