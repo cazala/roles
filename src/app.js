@@ -13,7 +13,6 @@ import * as labels from './labels.js';
 export const session = { provider: null, account: null, chain: null, epoch: 0 };
 const main = $('main');
 const network = n => ({ 1: 'Ethereum', 100: 'Gnosis', 137: 'Polygon', 10: 'Optimism', 8453: 'Base', 42161: 'Arbitrum' }[n] || 'Chain ' + n);
-let continuation = null;
 
 // ---- WalletConnect: an owner's wallet elsewhere (e.g. on a phone), connected by QR code ----
 // roles.wei is the dapp: it shows a QR code, the wallet approves, and signing requests go to it. A phone wallet
@@ -74,8 +73,7 @@ async function connected(wallet) {
   remember(wallet.key);
   for (const event of ['accountsChanged', 'chainChanged']) provider.on?.(event, changed);
   header();
-  const next = continuation; continuation = null;
-  if (next) await next(); else await route();
+  await route();
 }
 async function changed() {
   session.epoch++;
@@ -83,17 +81,12 @@ async function changed() {
   session.chain = Number(await rpc('eth_chainId'));
   header(); route();
 }
-export function requireWallet(next) {
-  if (session.account) return next();
-  continuation = next;
-  walletDialog();
-}
 function disconnect() {
   // Ask the wallet to forget this site where supported (EIP-2255; WalletConnect deletes its session).
   session.provider?.request?.({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }).catch?.(() => {});
   for (const event of ['accountsChanged', 'chainChanged']) session.provider?.removeListener?.(event, changed);
   use(null); session.provider = null; session.account = null; session.chain = null; session.epoch++;
-  remember('none'); continuation = null; header(); route();
+  remember('none'); header(); route();
 }
 // Account popover under the header button, as in safe.wei: the account menu, or the wallet list.
 const drop = $('drop');
@@ -122,6 +115,40 @@ function walletDialog() {
   popover(session.account ? 'menu' : 'pick');
 }
 $('connect').onclick = walletDialog;
+
+// ---- gates, as in safe.wei: an address opens at its URL, and the page says what it needs first (a wallet,
+// another chain) instead of an error. `intent` marks a fresh click, so a single wallet is connected, or a
+// certain chain switched, right away; a link opened on its own waits for a click.
+let intent = false, skipChain = null;
+const gateCard = (title, text, ...rest) => h('div.home.gate', h('div.panel.gatecard', h('span.mark', icon(...ICONS.people)), h('h2', title), text && h('p.mut', text), ...rest), h('p.gateback', h('a.back', { href: '#/' }, icon('m15 6-6 6 6 6'), 'Home')));
+function connectView(what) {
+  const ws = list(), out = h('div');
+  const buttons = ws.map((w, i) => {
+    const b = h('button' + (i ? '' : '.primary'), 'Connect ' + w.name);
+    b.onclick = act(b, () => connected(w), out);
+    return b;
+  });
+  if (intent && ws.length === 1) setTimeout(() => buttons[0].click());
+  intent = false;
+  return gateCard('Connect a wallet to open ' + what, 'roles.wei reads the chain through your wallet, and your wallet signs.', h('div.actions.gatebtns', buttons), out);
+}
+async function switchChain(id) {
+  try {
+    await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + id.toString(16) }]);
+  } catch (e) {
+    if (e?.code === 4902 && session.provider?.wallet === ownerWallet) throw Error(peerName() + ' did not approve ' + network(id) + ' when it connected. Disconnect, then connect again and approve ' + network(id) + '.');
+    throw Error(e?.code === 4902 ? 'Your wallet does not know ' + network(id) + '. Add it to your wallet first.' : e?.code === 4001 ? 'Switch cancelled.' : 'Your wallet could not switch to ' + network(id) + '. Switch it from the wallet.');
+  }
+  await changed();
+}
+/** The address is on another chain: offer the switch; right after a click it is asked at once, only when the chain is certain (`auto`). */
+function switchView(id, title, text, extra, auto = true) {
+  const out = h('div'), b = h('button.primary', 'Switch to ' + network(id));
+  b.onclick = act(b, () => switchChain(id), out);
+  if (intent && auto) setTimeout(() => b.click());
+  intent = false;
+  return gateCard(title, text, h('div.actions.gatebtns', b), out, extra);
+}
 
 /** Settings: RPC endpoints (reads go there instead of the wallet, per chain) and an Etherscan API key. */
 export function settingsDialog() {
@@ -160,13 +187,18 @@ function home() {
   const input = h('input.search', { id: 'open-address', placeholder: 'Search, or open 0x… / name.eth / name.wei', 'aria-label': 'Search or open an address', autocomplete: 'off', spellcheck: 'false' });
   const rows = h('div'), out = h('div');
   const open = h('button.primary', 'Open');
-  const go = () => requireWallet(async () => { const address = await resolve(input.value.trim()); location.hash = '/' + address; });
+  // Open at its URL; that page asks for a wallet or a chain if it needs one (the gates above).
+  const go = async () => {
+    const v = input.value.trim().toLowerCase();
+    if (!isAddr(v) && !/^[^\s/?#]+\.[a-z]+$/.test(v)) throw Error('Enter a 0x address or a name (name.eth, name.wei).');
+    intent = true; location.hash = '/' + v;
+  };
   open.onclick = act(open, go, out);
   input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); open.click(); } };
   const draw = () => {
     const q = input.value.toLowerCase().trim();
     const found = saved.filter(x => (x.address + ' ' + (labels.get(x.address) || '')).toLowerCase().includes(q));
-    put(rows, found.length ? h('div.slist', found.map(x => h('div.srow', h('a.name', { href: '#/' + x.address + '?chain=' + x.chain }, labels.get(x.address) || short(x.address)), h('span.mut', network(x.chain)), h('span.grow'), h('button.link', { onclick: () => { saved = saved.filter(y => y !== x); save(); draw(); put(out, h('p', 'Removed. ', h('button.link', { onclick: () => { saved.push(x); save(); draw(); put(out); } }, 'Undo'))); } }, 'Remove'), icon(...ICONS.next)))) : h('p.empty', saved.length ? 'No saved address matches.' : 'Safes and Roles modifiers you open will be listed here.'));
+    put(rows, found.length ? h('div.slist', found.map(x => h('div.srow', h('a.name', { href: '#/' + x.address + '?chain=' + x.chain, onclick: () => (intent = true) }, labels.get(x.address) || short(x.address)), h('span.mut', network(x.chain)), h('span.grow'), h('button.link', { onclick: () => { saved = saved.filter(y => y !== x); save(); draw(); put(out, h('p', 'Removed. ', h('button.link', { onclick: () => { saved.push(x); save(); draw(); put(out); } }, 'Undo'))); } }, 'Remove'), icon(...ICONS.next)))) : h('p.empty', saved.length ? 'No saved address matches.' : 'Safes and Roles modifiers you open will be listed here.'));
   };
   input.oninput = draw;
   put(main, h('div.home' + (saved.length ? '.returning' : ''), !saved.length && h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.')), h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint', 'You’ll connect your wallet to open it.'), out), rows)); draw();
@@ -176,11 +208,19 @@ export async function route() {
   put($('batch'));
   const path = location.hash.replace(/^#\/?/, '').split('?')[0].split('/');
   if (!path[0]) return home();
-  if (!session.account) { put(main, h('div.home.gate', h('div.panel.gatecard', h('span.mark', icon(...ICONS.people)), h('h2', 'Connect a wallet to open this address'), h('p', 'Chain reads use your wallet’s RPC.'), h('button.primary', { onclick: () => requireWallet(route) }, 'Connect a wallet')))); return; }
+  put($('crumb'));
+  const ref = decodeURIComponent(path[0]), lower = ref.toLowerCase();
+  const what = isAddr(ref) ? labels.get(lower) || short(lower) : lower;
+  if (!session.account) return put(main, connectView(what));
   try {
-    const requested = new URLSearchParams(location.hash.split('?')[1] || '').get('chain');
-    if (requested && Number(requested) !== session.chain) { put(main, h('div.panel', h('h2', 'Switch to ' + network(Number(requested))), h('button.primary', { onclick: () => requireWallet(async () => { try { await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + Number(requested).toString(16) }]); await changed(); } catch (e) { main.append(bad(e.code === 4902 ? (session.provider?.wallet === ownerWallet ? peerName() + ' did not approve ' + network(Number(requested)) + ' when it connected. Disconnect, then connect again and approve it.' : 'Add this chain in your wallet, then try again.') : friendlyError(e))); } }) }, 'Switch chain'))); return; }
-    const address = await resolve(path[0]);
+    // The chain is certain when the link says it (?chain=, as saved addresses open). An address saved only on
+    // another chain may exist here too: offer both, and switch only if asked.
+    const sure = Number(new URLSearchParams(location.hash.split('?')[1] || '').get('chain')) || null;
+    const here = isAddr(ref) ? saved.filter((x) => x.address === lower) : [];
+    const want = sure || (here.length && !here.some((x) => x.chain === session.chain) && skipChain !== lower ? here[0].chain : null);
+    if (want && want !== session.chain) return put(main, switchView(want, what + ' is on ' + network(want), 'Your wallet is on ' + network(session.chain) + '.', !sure && h('p.gatealt', h('button.link', { onclick: () => ((skipChain = lower), route()) }, 'Open it on ' + network(session.chain) + ' anyway')), !!sure));
+    if (!isAddr(ref) && session.chain !== 1) return put(main, switchView(1, ref + ' is a name on Ethereum', 'ENS and .wei names resolve on Ethereum, and your wallet is on ' + network(session.chain) + '. Switch to Ethereum, or open it by its 0x address.'));
+    const address = await resolve(lower);
     put(main, h('p.mut', 'Reading the chain…'));
     const view = await renderAddress(address, path.slice(1), epoch);
     if (epoch !== session.epoch) return;
