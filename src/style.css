@@ -537,3 +537,34 @@ p.rvsend { margin: 8px 0 0; }
 .cval > button.link { margin-top: 10px; font-size: 12px; }
 button.link.addval { align-self: flex-start; font-size: 13px; }
 .panel.cfield.flash { border-color: var(--fg); transition: border-color 1.2s; }
+/* ⓘ next to a label, and its explanation. */
+label.infol { position: relative; display: flex; align-items: center; gap: 6px; }
+button.info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 1px solid var(--mut); border-radius: 50%; background: none; color: var(--mut); font: italic 600 10px/1 Georgia, serif; }
+button.info:hover, button.info[aria-expanded="true"] { border-color: var(--fg); color: var(--fg); }
+.infotip { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 6px 20px rgba(0, 0, 0, .3); color: var(--fg); font-size: 13px; font-weight: 400; line-height: 1.45; }
+.infotip[hidden] { display: none; }
+/* Allowances: a card each, read as a sentence; the editor, one field per line with its ⓘ. */
+.allowances > p.small { margin: 4px 0 14px; }
+.abody { padding: 12px 14px; }
+.abody p { margin: 0; }
+p.abal { font-size: 18px; }
+p.abal b { font-weight: 600; }
+p.abal .mut { font-size: 14px; }
+p.aline { margin-top: 6px !important; font-size: 14px; }
+.abody p.small { margin-top: 8px; }
+.acard .tfoot { justify-content: flex-start; gap: 0; font-size: 13px; }
+.afield { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 0; }
+.afield label.infol { margin: 0; color: var(--mut); font-size: 13px; }
+.dbody > label.infol { margin: 12px 0 6px; color: var(--mut); font-size: 13px; }
+.afield .fhint { margin: 0; }
+.afield .fhint:empty { display: none; }
+.afield .row { gap: 8px; }
+.afield .row input { flex: 1; min-width: 0; }
+.arefill { padding-left: 12px; border-left: 2px solid var(--line); }
+details.adv { margin: 12px 0 0; border: 0; }
+details.adv > summary { font-size: 13px; color: var(--mut); }
+p.asum { margin: 16px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--bg); font-size: 14px; }
+p.asum:empty { display: none; }
+.rhead .grow { flex: 1; }
+.afield .row select { flex: none; width: auto; }
+.afield .row input[aria-label="Every"] { flex: none; width: 90px; }
