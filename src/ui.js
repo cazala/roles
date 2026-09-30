@@ -58,6 +58,7 @@ export const ICONS = {
   phone: ['M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z', 'M11 18h2'],
   next: ['m9 6 6 6-6 6'],
   plus: ['M12 5v14', 'M5 12h14'],
+  dots: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
   tag: ['M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z', 'M7.5 7.5h.01'],
   gear: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z'],
 };
@@ -274,3 +275,25 @@ export function iconButton(name, title, fn, on) {
   b.onclick = (e) => (e.preventDefault(), e.stopPropagation(), fn());
   return b;
 }
+
+/**
+ * A ⋯ button opening a small menu of actions. `items` (or a function returning them, read when it opens) is a
+ * list of [label, fn, danger] entries; falsy entries are skipped. One menu is open at a time.
+ */
+export function menu(items, label = 'Actions') {
+  const list = h('div.dropdown.kmenu', { role: 'menu', hidden: true });
+  const b = h('button.ib', { title: label, 'aria-label': label, 'aria-haspopup': 'menu' });
+  b.append(icon(...ICONS.dots));
+  b.onclick = (e) => {
+    e.stopPropagation();
+    const open = list.hidden;
+    closeMenus();
+    if (!open) return;
+    put(list, (typeof items === 'function' ? items() : items).filter(Boolean).map(([text, fn, danger]) => h('button' + (danger ? '.danger' : ''), { role: 'menuitem', onclick: (x) => (x.stopPropagation(), (list.hidden = true), fn()) }, text)));
+    list.hidden = false;
+  };
+  return h('span.kebab', b, list);
+}
+const closeMenus = () => document.querySelectorAll('.kmenu').forEach((m) => (m.hidden = true));
+document.addEventListener('pointerdown', (e) => !e.target.closest('.kebab') && closeMenus());
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closeMenus());

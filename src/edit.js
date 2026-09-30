@@ -1,4 +1,5 @@
 import { $, h, put, addr, bad, warn, act, sheet, copyButton } from './ui.js';
+import { parseAbi } from './abicoder.js';
 import { session } from './app.js';
 import { roleView, body as readBody } from './views.js';
 import { diff, SIG } from './diff.js';
@@ -32,17 +33,50 @@ export function form(title, fields, submit) {
   body.append(out,h('div.actions',h('button',{onclick:close},'Cancel'),save));
   Object.values(controls)[0]?.focus();
 }
+const OPTIONS_HINT='CALL is a normal call. DELEGATECALL runs the target’s code as the Safe itself, so it can change anything in the Safe: allow it only for trusted batch contracts such as MultiSend. “With ETH” also lets the role send the Safe’s ETH.';
 const opOptions=[[0,'CALL, no ETH'],[1,'CALL with ETH'],[2,'CALL or DELEGATECALL, no ETH'],[3,'CALL or DELEGATECALL with ETH']];
-export function memberForm(ctx,key,member='') {
-  form('Role membership',[{key:'member',label:'Member address',value:member},{key:'mode',label:'Membership',options:[['add','Add member'],['remove','Remove member'],['default','Set as default role']]}],v=>mutate(ctx,s=>{const a=checkAddress(v.member);if(v.mode==='default')s.defaults[a]=key;else {role(s,key).members[a]=v.mode==='add';s.enabled[a]=true;}}));
+export function targetForm(ctx,key) {
+  form('Add target',[{key:'address',label:'Target contract address',hint:'The contract this role may call.'},{key:'mode',label:'Access',value:2,options:[[2,'Only functions I add'],[1,'Every function']]},{key:'options',label:'Execution options (every function)',value:0,options:opOptions,hint:OPTIONS_HINT}],v=>mutate(ctx,s=>{const a=checkAddress(v.address),t=target(s,key,a);if(t.clearance)throw Error('This role already has this target.');t.clearance=Number(v.mode);t.options=t.clearance===1?Number(v.options):0;}));
 }
-export function targetForm(ctx,key,address='') {
-  const t=draft(ctx).value.roles[key]?.targets[address];
-  form('Target permission',[{key:'address',label:'Target address',value:address},{key:'mode',label:'Access',value:t?.clearance??2,options:[[2,'Only configured functions'],[1,'All functions'],[0,'Revoke target']]},{key:'options',label:'Execution options',value:t?.options??0,options:opOptions}],v=>mutate(ctx,s=>{const t=target(s,key,checkAddress(v.address));t.clearance=Number(v.mode);t.options=t.clearance===1?Number(v.options):0;}));
+/** Add a function to a scoped target: pick it from the contract's ABI (yours or Etherscan's), or type a signature or selector. */
+function addFunction(ctx,key,t,names) {
+  const {body,close}=sheet('edit','Add function',true),out=h('div');
+  const options=h('select',{'aria-label':'Execution options'},opOptions.map(([value,text])=>h('option',{value},text)));
+  const add=(sel,withConditions,f)=>{mutate(ctx,s=>{const x=target(s,key,t.address);if(x.clearance!==2)throw Error('This target allows every function already.');x.functions[sel]={selector:sel,options:Number(options.value),conditions:null};});close();if(withConditions&&editorHooks.conditions)editorHooks.conditions(ctx,key,{address:t.address,fn:f});};
+  const fns=names?names.abi.filter(f=>f.write&&!t.functions['0x'+f.selector]):[];
+  const search=h('input',{placeholder:'Search functions',spellcheck:'false',autocomplete:'off','aria-label':'Search functions'}),rows=h('div.slist.fpick');
+  const draw=()=>{const q=search.value.trim().toLowerCase();const found=fns.filter(f=>f.sig.toLowerCase().includes(q));put(rows,found.length?found.map(f=>h('div.srow',h('code.sig',h('b',f.name),'('+f.inputs.map(i=>i.type+(i.name?' '+i.name:'')).join(', ')+')'),h('span.grow'),f.inputs.length>0&&h('button.link',{onclick:()=>add('0x'+f.selector,true,f)},'With conditions…'),h('button.sm',{onclick:()=>add('0x'+f.selector,false,f)},'Allow'))):h('p.empty',q?'No function matches.':'Every function in the ABI is already configured.'));};
+  search.oninput=draw;
+  const sig=h('input',{placeholder:'transfer(address to, uint256 amount) or 0xa9059cbb',spellcheck:'false',autocomplete:'off','aria-label':'Function signature or selector'}),byHand=h('button','Add');
+  byHand.onclick=act(byHand,async()=>{const text=sig.value.trim();if(!text)throw Error('Enter a signature or a selector.');const f=/^0x[0-9a-fA-F]{8}$/.test(text)?null:parseAbi(text)[0];add(selector(text),false,f);},out);
+  put(body,h('label','Execution options'),options,h('p.fhint',OPTIONS_HINT),
+    names?.abi.length?[h('label','From the contract’s ABI'),fns.length>6&&search,rows]:h('p.mut.small','No ABI for this contract: type the function, or add its ABI from the target’s ⋯ menu to pick from a list.'),
+    h('label','Or type a signature or selector'),h('div.row',sig,byHand),out);
+  if(names?.abi.length)draw();
+  (fns.length>6?search:sig).focus();
 }
-export function functionForm(ctx,key,address='',select='') {
-  const existing=draft(ctx).value.roles[key]?.targets[address]?.functions[select];
-  form('Function permission',[{key:'address',label:'Target address',value:address},{key:'selector',label:'Function signature or selector',value:select,hint:'For example transfer(address recipient,uint256 amount).'},{key:'mode',label:'Parameter permission',options:[['allow','Allow any parameters'],['revoke','Revoke function']]},{key:'options',label:'Execution options',value:existing?.options??0,options:opOptions}],v=>mutate(ctx,s=>{const a=checkAddress(v.address), sel=selector(v.selector),t=target(s,key,a);if(v.mode==='revoke')delete t.functions[sel];else {if(t.clearance!==2)throw Error('Set this target to “Only configured functions” before adding a function.');t.functions[sel]={selector:sel,options:Number(v.options),conditions:null};}}));
+function optionsForm(title,value,save){form(title,[{key:'options',label:'Execution options',value,options:opOptions,hint:OPTIONS_HINT}],v=>save(Number(v.options)));}
+/** The actions on a role page's cards, functions and members; role-view.js calls them from the ⋯ menus. */
+function edits(ctx,key) {
+  const base=()=>draft(ctx).base.roles[key];
+  const on=(t,fn)=>s=>fn(target(s,key,t.address),s);
+  return {
+    addTarget:()=>targetForm(ctx,key),
+    allowAll:t=>optionsForm('Allow every function',t.clearance===1?t.options:0,o=>mutate(ctx,on(t,x=>{x.clearance=1;x.options=o;}))),
+    scope:t=>mutate(ctx,on(t,x=>{x.clearance=2;x.options=0;})),
+    revokeTarget:t=>mutate(ctx,on(t,x=>{x.clearance=0;x.options=0;})),
+    restoreTarget:t=>mutate(ctx,s=>{role(s,key).targets[t.address]=structuredClone(base().targets[t.address]);}),
+    addFunction:(t,names)=>addFunction(ctx,key,t,names),
+    conditions:(t,fn,f)=>editorHooks.conditions&&editorHooks.conditions(ctx,key,{address:t.address,fn:f,options:fn.options}),
+    allowAny:(t,fn)=>mutate(ctx,on(t,x=>{x.functions[fn.selector].conditions=null;})),
+    fnOptions:(t,fn)=>optionsForm('Execution options',fn.options,o=>mutate(ctx,on(t,x=>{x.functions[fn.selector].options=o;}))),
+    revokeFn:(t,fn)=>mutate(ctx,on(t,x=>{delete x.functions[fn.selector];})),
+    restoreFn:(t,fn)=>mutate(ctx,on(t,x=>{x.functions[fn.selector]=structuredClone(base().targets[t.address].functions[fn.selector]);})),
+    addMember:()=>form('Add member',[{key:'member',label:'Member address',hint:'The account or Safe that may use this role.'},{key:'def',label:'Default role',options:[['no','Keep their current default role'],['yes','Make this their default role']],hint:'Calls without a role key use the member’s default role.'}],v=>mutate(ctx,s=>{const a=checkAddress(v.member);role(s,key).members[a]=true;s.enabled[a]=true;if(v.def==='yes')s.defaults[a]=key;})),
+    removeMember:a=>mutate(ctx,s=>{role(s,key).members[a]=false;}),
+    restoreMember:a=>mutate(ctx,s=>{role(s,key).members[a]=true;}),
+    makeDefault:a=>mutate(ctx,s=>{s.defaults[a]=key;}),
+  };
 }
 function allowanceForm(ctx,key='') {
   const a=draft(ctx).value.allowances[key]||{};
@@ -111,11 +145,13 @@ export function editBody(ctx,path) {
   const d=draft(ctx),root=h('div');
   ctx.redraw=()=>{
     const calls=diff(d.base,d.value,ctx.address);
-    put($('batch'),calls.length > 0 && h('button',{onclick:()=>review(ctx)},calls.length+' changes'));
-    const toolbar=calls.length?h('div.actions',h('button.primary',{onclick:()=>review(ctx)},'Review changes ('+calls.length+')'),d.history.length>0&&h('button',{onclick:()=>{d.value=d.history.pop();ctx.redraw();}},'Undo'),h('button.link',{onclick:()=>{drafts.delete(id(ctx));put($('batch'));ctx.refresh();}},'Discard draft')):null;
-    const stateCtx={...ctx,state:d.value};
+    put($('batch'),calls.length > 0 && h('button',{onclick:()=>review(ctx)},calls.length+' change'+(calls.length===1?'':'s')));
+    // The draft, in one bar above the page: how many changes, Undo, Discard, Review.
+    const toolbar=calls.length?h('div.draftbar',h('span',calls.length+' pending change'+(calls.length===1?'':'s')),h('span.grow'),d.history.length>0&&h('button.link',{onclick:()=>{d.value=d.history.pop();ctx.redraw();}},'Undo'),h('button.link',{onclick:()=>{drafts.delete(id(ctx));put($('batch'));ctx.refresh();}},'Discard'),h('button.primary.sm',{onclick:()=>review(ctx)},'Review changes')):null;
+    const stateCtx={...ctx,state:d.value,base:d.base};
     if(path[0]==='role') {
-      const key=path[1],member=d.value.roles[key]?.members[session.account]&&d.value.enabled[session.account];put(root,toolbar,roleView(stateCtx,key),h('div.actions',member&&editorHooks.use&&h('button.primary',{onclick:()=>editorHooks.use(ctx,key)},'Use this role'),h('button',{onclick:()=>memberForm(ctx,key)},'Edit members'),h('button',{onclick:()=>targetForm(ctx,key)},'Edit target'),h('button',{onclick:()=>functionForm(ctx,key)},'Edit function'),editorHooks.conditions&&h('button',{onclick:()=>editorHooks.conditions(ctx,key)},'Edit conditions')));
+      const key=path[1],member=d.value.roles[key]?.members[session.account]&&d.value.enabled[session.account];
+      put(root,toolbar,roleView({...stateCtx,edit:edits(ctx,key),roleActions:member&&editorHooks.use&&h('button.primary.sm',{onclick:()=>editorHooks.use(ctx,key)},'Use this role')},key));
     } else if(path[0]==='allowances')put(root,toolbar,allowanceView(stateCtx),h('button',{onclick:()=>allowanceForm(ctx)},'Set allowance'),Object.keys(d.value.allowances).map(key=>h('div.actions',h('button.link',{onclick:()=>allowanceForm(ctx,key)},'Edit '+keyName(key)))));
     else {const roles=Object.values(d.value.roles);put(root,toolbar,h('h2','Roles'),roles.length?h('div.slist',roles.map(r=>h('a.srow',{href:'#/'+ctx.address+'/role/'+r.key},h('b',keyName(r.key)),h('span.mut',Object.values(r.members).filter(Boolean).length+' members · '+Object.values(r.targets).filter(t=>t.clearance).length+' targets')))):h('p.empty','No roles configured yet. Choose New role to start.'),h('div.actions',h('button',{onclick:()=>form('New role',[{key:'key',label:'Role name or bytes32 key'}],v=>{const key=roleKey(v.key);mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;})},'New role')),h('details',h('summary','Modifier settings'),h('div.actions',h('button',{onclick:()=>settings(ctx)},'Owner, avatar and target'),h('button',{onclick:()=>unwrapForm(ctx)},'Transaction unwrapper'))));}
   };
