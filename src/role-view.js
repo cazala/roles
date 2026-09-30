@@ -2,7 +2,7 @@
 // and Members. Function and parameter names are display only: an ABI entry is used for a function only when it
 // hashes to that function's selector, which is what executes. Values are decoded by the ABI type when known,
 // and otherwise shown exactly as encoded.
-import { h, put, addr, warn, copy, menu, sheet, toClipboard } from './ui.js';
+import { h, put, addr, warn, copy, menu, sheet, toClipboard, copyButton } from './ui.js';
 import { parseAbi } from './abicoder.js';
 import { toTree, TYPES } from './conditions.js';
 import { keyName, json } from './roles.js';
@@ -92,7 +92,7 @@ function node(n, p, ctx) {
 export function conditionTable(flat, f, ctx) {
   try {
     const root = toTree(flat);
-    return h('div.ctable', h('div.crow.chead', h('span', 'Parameter'), h('span', 'Type'), h('span', 'Condition'), h('span', 'Value')), node(root, { inputs: f ? f.inputs : null, name: 'Call data' }, ctx), h('details', h('summary', 'Exact conditions'), h('pre', json(flat))));
+    return h('div.ctable', h('div.crow.chead', h('span', 'Parameter'), h('span', 'Type'), h('span', 'Condition'), h('span', 'Value')), node(root, { inputs: f ? f.inputs : null, name: 'Call data' }, ctx));
   } catch (e) {
     return h('div', warn(e.message), h('pre', json(flat)));
   }
@@ -108,16 +108,23 @@ const mark = (was, now) => !was ? 'new' : !now ? 'gone' : same(was, now) ? null 
 const markChip = (m) => m === 'new' ? h('span.chip.draft', 'New') : m === 'changed' ? h('span.chip.draft', 'Changed') : m === 'gone' ? h('span.chip.draft', 'Revoked in draft') : null;
 function fnView(fn, f, t, ctx, m) {
   const s = sel(fn.selector), ed = ctx.edit;
-  const actions = ed && (m === 'gone'
+  const actions = m === 'gone'
     ? h('button.link', { onclick: () => ed.restoreFn(t, fn) }, 'Restore')
     : menu(() => [
-      ['Edit conditions', () => ed.conditions(t, fn, f)],
-      fn.conditions && ['Allow any parameters', () => ed.allowAny(t, fn)],
-      ['Execution options…', () => ed.fnOptions(t, fn)],
-      ['Revoke function', () => ed.revokeFn(t, fn), true],
-    ], 'Function actions'));
+      ed && ['Edit conditions', () => ed.conditions(t, fn, f)],
+      ed && fn.conditions && ['Allow any parameters', () => ed.allowAny(t, fn)],
+      ed && ['Execution options…', () => ed.fnOptions(t, fn)],
+      fn.conditions && ['Exact conditions', () => exact(fn, f, s)],
+      ['Copy selector', () => toClipboard('0x' + s).catch(() => {})],
+      ed && ['Revoke function', () => ed.revokeFn(t, fn), true],
+    ], 'Function actions');
   return h('div.fn' + (m ? '.pend' : '') + (m === 'gone' ? '.gone' : ''), h('div.fnhead', signature(f, s), h('span.chip.mono', '0x' + s), chips(fn.options), markChip(m), h('span.grow'), actions),
     m !== 'gone' && [t.clearance !== 2 && warn('Dormant: the target allows all functions, or is revoked.'), fn.conditions ? conditionTable(fn.conditions, f, ctx) : h('p.mut.fnfree', 'Any parameters.')]);
+}
+/** The conditions exactly as stored onchain (the flat list the contract checks), to read or copy. */
+function exact(fn, f, s) {
+  const { body } = sheet('edit', 'Exact conditions', true), text = json(fn.conditions);
+  put(body, h('p.mut.small', 'The conditions as the contract stores them for ', h('code', f ? f.sig : '0x' + s), ': a flat list where each entry names its parent. This is what executes; the table is a reading of it.'), h('pre.exact', text), h('div.actions', copyButton('Copy', text)));
 }
 /** Your ABI for a contract: upload a .json (an ABI or a compiler artifact) or paste one, with an optional name. */
 function abiDialog(ctx, address, done) {

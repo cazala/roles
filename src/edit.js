@@ -1,4 +1,5 @@
-import { $, h, put, addr, bad, warn, act, sheet, copyButton } from './ui.js';
+import { $, h, put, addr, bad, warn, act, sheet, copyButton, short } from './ui.js';
+import * as labels from './labels.js';
 import { parseAbi } from './abicoder.js';
 import { session } from './app.js';
 import { roleView, body as readBody } from './views.js';
@@ -20,13 +21,38 @@ export function draft(ctx) {
 const checkAddress = text => { if(!isAddr(text.trim()) || text.toLowerCase()===ZERO)throw Error('Enter a nonzero 0x address.');return text.trim().toLowerCase(); };
 const selector = text => /^0x[0-9a-fA-F]{8}$/.test(text)?text.toLowerCase():'0x'+signature(text).selector;
 export function mutate(ctx, fn) { const d=draft(ctx), next=structuredClone(d.value);fn(next);diff(d.base,next,ctx.address);d.history.push(d.value);d.value=next;ctx.redraw(); }
+/**
+ * An address input that suggests your labelled addresses: all of them on focus (the list scrolls past a few),
+ * filtered by label or address as you type; arrows and Enter pick one. `list()` gives [address, label] pairs.
+ */
+function suggest(input,list) {
+  const box=h('div.suggest',{hidden:true,role:'listbox'});let rows=[],at=-1;
+  const pick=a=>{input.value=a;box.hidden=true;input.dispatchEvent(new Event('input'));};
+  const draw=()=>{
+    const q=input.value.trim().toLowerCase(),all=list();
+    const found=all.filter(([a,l])=>!q||l.toLowerCase().includes(q)||a.includes(q)).sort((x,y)=>x[1].localeCompare(y[1]));
+    rows=found.slice(0,100);at=-1;
+    put(box,rows.map(([a,l],i)=>h('button.sopt',{type:'button',role:'option',onpointerdown:e=>e.preventDefault(),onclick:()=>pick(a)},h('b',l),h('code',short(a)))),found.length>rows.length&&h('p.mut.small',(found.length-rows.length)+' more: type to filter'),!rows.length&&all.length>0&&q&&h('p.mut.small','No label matches. Paste the 0x address.'));
+    box.hidden=!rows.length||(isAddr(input.value.trim())&&rows.some(([a])=>a===input.value.trim().toLowerCase()));
+  };
+  const move=d=>{if(!rows.length)return;at=(at+d+rows.length)%rows.length;box.querySelectorAll('.sopt').forEach((b,i)=>b.classList.toggle('on',i===at));box.querySelectorAll('.sopt')[at].scrollIntoView({block:'nearest'});};
+  input.addEventListener('focus',draw);input.addEventListener('input',draw);
+  input.addEventListener('blur',()=>setTimeout(()=>box.hidden=true,100));
+  input.addEventListener('keydown',e=>{if(box.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();move(e.key==='ArrowDown'?1:-1);}else if(e.key==='Enter'&&at>=0){e.preventDefault();pick(rows[at][0]);}else if(e.key==='Escape'){e.stopPropagation();e.preventDefault();box.hidden=true;}});
+  const named=h('p.fhint.picked');
+  input.addEventListener('input',()=>put(named,labels.get(input.value.trim())&&['Your label: ',h('b',labels.get(input.value.trim()))]));
+  input.placeholder='0x… or search your labels';
+  return h('div.combo',input,box,named);
+}
+/** Your labelled addresses as [address, label], leaving out `skip` (addresses already there). */
+const labelled=skip=>Object.entries(labels.all()).filter(([a])=>isAddr(a)&&!skip.includes(a));
 export function form(title, fields, submit) {
   const {body,close}=sheet('edit',title,true), out=h('div'), controls={};
   for(const f of fields) {
     const input=f.options?h('select',{'aria-label':f.label},f.options.map(([value,text])=>h('option',{value},text))):h(f.multiline?'textarea':'input',{'aria-label':f.label,spellcheck:'false',autocomplete:'off'});
     if(f.value!=null)input.value=String(f.value);
     controls[f.key]=input;
-    body.append(h('label',f.label),input);
+    body.append(h('label',f.label),f.suggest?suggest(input,f.suggest):input);
     if (f.hint) body.append(h('p.fhint',f.hint));
   }
   const save=h('button.primary','Add to pending changes');save.onclick=act(save,async()=>{await submit(Object.fromEntries(Object.entries(controls).map(([k,v])=>[k,v.value])));close();},out);
@@ -36,7 +62,8 @@ export function form(title, fields, submit) {
 const OPTIONS_HINT='CALL is a normal call. DELEGATECALL runs the target’s code as the Safe itself, so it can change anything in the Safe: allow it only for trusted batch contracts such as MultiSend. “With ETH” also lets the role send the Safe’s ETH.';
 const opOptions=[[0,'CALL, no ETH'],[1,'CALL with ETH'],[2,'CALL or DELEGATECALL, no ETH'],[3,'CALL or DELEGATECALL with ETH']];
 export function targetForm(ctx,key) {
-  form('Add target',[{key:'address',label:'Target contract address',hint:'The contract this role may call.'},{key:'mode',label:'Access',value:2,options:[[2,'Only functions I add'],[1,'Every function']]},{key:'options',label:'Execution options (every function)',value:0,options:opOptions,hint:OPTIONS_HINT}],v=>mutate(ctx,s=>{const a=checkAddress(v.address),t=target(s,key,a);if(t.clearance)throw Error('This role already has this target.');t.clearance=Number(v.mode);t.options=t.clearance===1?Number(v.options):0;}));
+  const have=Object.values(draft(ctx).value.roles[key]?.targets||{}).filter(t=>t.clearance).map(t=>t.address);
+  form('Add target',[{key:'address',label:'Target contract address',hint:'The contract this role may call.',suggest:()=>labelled(have)},{key:'mode',label:'Access',value:2,options:[[2,'Only functions I add'],[1,'Every function']]},{key:'options',label:'Execution options (every function)',value:0,options:opOptions,hint:OPTIONS_HINT}],v=>mutate(ctx,s=>{const a=checkAddress(v.address),t=target(s,key,a);if(t.clearance)throw Error('This role already has this target.');t.clearance=Number(v.mode);t.options=t.clearance===1?Number(v.options):0;}));
 }
 /** Add a function to a scoped target: pick it from the contract's ABI (yours or Etherscan's), or type a signature or selector. */
 function addFunction(ctx,key,t,names) {
@@ -72,7 +99,7 @@ function edits(ctx,key) {
     fnOptions:(t,fn)=>optionsForm('Execution options',fn.options,o=>mutate(ctx,on(t,x=>{x.functions[fn.selector].options=o;}))),
     revokeFn:(t,fn)=>mutate(ctx,on(t,x=>{delete x.functions[fn.selector];})),
     restoreFn:(t,fn)=>mutate(ctx,on(t,x=>{x.functions[fn.selector]=structuredClone(base().targets[t.address].functions[fn.selector]);})),
-    addMember:()=>form('Add member',[{key:'member',label:'Member address',hint:'The account or Safe that may use this role.'},{key:'def',label:'Default role',options:[['no','Keep their current default role'],['yes','Make this their default role']],hint:'Calls without a role key use the member’s default role.'}],v=>mutate(ctx,s=>{const a=checkAddress(v.member);role(s,key).members[a]=true;s.enabled[a]=true;if(v.def==='yes')s.defaults[a]=key;})),
+    addMember:()=>form('Add member',[{key:'member',label:'Member address',hint:'The account or Safe that may use this role.',suggest:()=>labelled(Object.keys(draft(ctx).value.roles[key]?.members||{}).filter(a=>draft(ctx).value.roles[key].members[a]))},{key:'def',label:'Default role',options:[['no','Keep their current default role'],['yes','Make this their default role']],hint:'Calls without a role key use the member’s default role.'}],v=>mutate(ctx,s=>{const a=checkAddress(v.member);role(s,key).members[a]=true;s.enabled[a]=true;if(v.def==='yes')s.defaults[a]=key;})),
     removeMember:a=>mutate(ctx,s=>{role(s,key).members[a]=false;}),
     restoreMember:a=>mutate(ctx,s=>{role(s,key).members[a]=true;}),
     makeDefault:a=>mutate(ctx,s=>{s.defaults[a]=key;}),

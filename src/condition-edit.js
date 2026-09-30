@@ -5,6 +5,28 @@ import { conditionView } from './condition-view.js';
 import { mutate } from './edit.js';
 import { target } from './roles.js';
 import { isAddr, ZERO } from './abi.js';
+import { parseUnits, formatUnits } from './units.js';
+
+// A value field: `plain` text, or for numbers `amount`, typed in a unit (base units, gwei, ether, 6 or 8
+// decimals, or the target token's own decimals) with the exact base units it becomes shown under it.
+const plain=(label,type)=>{const input=h('input',{'aria-label':label,placeholder:type,spellcheck:'false',autocomplete:'off'});return {el:input,get:()=>input.value,key:k=>(input.placeholder=k?'Allowance name or bytes32 key':type)};};
+function amount(label,token) {
+  const input=h('input',{'aria-label':label,placeholder:'Amount',spellcheck:'false',autocomplete:'off',inputmode:'decimal'}),note=h('p.fhint');
+  const units=h('select.unit',{'aria-label':label+' unit'},[[0,'Base units'],token!=null&&[token,'Token units ('+token+')'],[9,'Gwei (×10⁹)'],[18,'Ether (×10¹⁸)'],[6,'×10⁶'],[8,'×10⁸']].filter(Boolean).map(([v,t])=>h('option',{value:v},t)));
+  let isKey=false;
+  const show=()=>{
+    const v=input.value.trim(),d=Number(units.value);
+    if(isKey||!v)return put(note);
+    try {const n=parseUnits(v,d);put(note,d?'= '+n.toString()+' base units':token!=null&&token>0?'= '+formatUnits(n,token)+' in token units':'');}
+    catch(e){put(note,h('span.bad',e.message));}
+  };
+  input.oninput=units.onchange=show;
+  return {el:h('div.amount',h('div.row',input,units),note),get:()=>isKey?input.value:parseUnits(input.value,Number(units.value)).toString(),key:k=>{isKey=k;units.hidden=k;input.placeholder=k?'Allowance name or bytes32 key':'Amount';show();}};
+}
+/** The target's decimals() when it answers like a token (0–36), for typing amounts in its units. */
+async function decimalsOf(ctx,a) {
+  try {const r=await ctx.request('eth_call',[{to:a,data:'0x313ce567'},'latest']);if(!/^0x[0-9a-f]{64}$/i.test(r))return null;const d=Number(BigInt(r));return d>0&&d<=36?d:null;} catch {return null;}
+}
 
 const modes=p=>{
   const out=[['pass','Any value'],['equal','Equal to'],['oneof','One of two values']];
@@ -21,12 +43,24 @@ export function editConditions(ctx,key,pre={}) {
   load.onclick=act(load,async()=>{
     const a=address.value.trim().toLowerCase();if(!isAddr(a)||a===ZERO)throw Error('Enter a nonzero target address.');
     const functions=pre.fn&&a===pre.address?[pre.fn]:parseAbi(abi.value).filter(f=>f.write);if(!functions.length)throw Error('That ABI has no write functions.');
-    const fn=h('select',{'aria-label':'Function'},functions.map(f=>h('option',{value:f.sig},f.sig))),options=h('select',{'aria-label':'Execution options'},[[0,'CALL, no ETH'],[1,'CALL with ETH'],[2,'CALL or DELEGATECALL, no ETH'],[3,'CALL or DELEGATECALL with ETH']].map(([v,t])=>h('option',{value:v},t))),rows=h('div'),preview=h('div'),ether=h('input',{'aria-label':'ETH allowance key',placeholder:'Optional name or bytes32 key'}),calls=h('input',{'aria-label':'Call allowance key',placeholder:'Optional name or bytes32 key'});
+    const fn=h('select',{'aria-label':'Function'},functions.map(f=>h('option',{value:f.sig},f.sig))),options=h('select',{'aria-label':'Execution options'},[[0,'CALL, no ETH'],[1,'CALL with ETH'],[2,'CALL or DELEGATECALL, no ETH'],[3,'CALL or DELEGATECALL with ETH']].map(([v,t])=>h('option',{value:v},t))),rows=h('div.cfields'),preview=h('div'),ether=h('input',{'aria-label':'ETH allowance key',placeholder:'Optional name or bytes32 key'}),calls=h('input',{'aria-label':'Call allowance key',placeholder:'Optional name or bytes32 key'});
     if(pre.options!=null)options.value=String(pre.options);let controls=[];
-    const render=()=>{const active=functions.find(f=>f.sig===fn.value);controls=conditionFields(active).map(field=>{const mode=h('select',{'aria-label':field.path+' condition'},modes(field.p).map(([v,t])=>h('option',{value:v},t))),value=h('input',{'aria-label':field.path+' comparison',placeholder:field.p.type,spellcheck:'false'}),second=h('input',{'aria-label':field.path+' second comparison',placeholder:'Second value or upper bound',spellcheck:'false'}),update=()=>{value.hidden=['pass','avatar'].includes(mode.value);second.hidden=!['oneof','between'].includes(mode.value);value.placeholder=mode.value==='allowance'?'Allowance name or bytes32 key':field.p.type;};mode.onchange=update;update();return {field,mode,value,second,row:h('div.panel',h('b',field.path+' · '+field.p.type),mode,value,second)};});put(rows,controls.map(x=>x.row));put(preview);};
+    const token=await decimalsOf(ctx,a);
+    const render=()=>{
+      const active=functions.find(f=>f.sig===fn.value);
+      controls=conditionFields(active).map(field=>{
+        const number=/^u?int\d*$/.test(field.p.type);
+        const mode=h('select',{'aria-label':field.path+' condition'},modes(field.p).map(([v,t])=>h('option',{value:v},t)));
+        const value=number?amount(field.path+' value',token):plain(field.path+' value',field.p.type),second=number?amount(field.path+' upper bound or second value',token):plain(field.path+' second value',field.p.type);
+        const update=()=>{value.el.hidden=['pass','avatar'].includes(mode.value);second.el.hidden=!['oneof','between'].includes(mode.value);value.key(mode.value==='allowance');};
+        mode.onchange=update;update();
+        return {field,mode,value,second,row:h('div.panel.cfield',h('b',field.path,h('span.mut',' · '+field.p.type)),mode,value.el,second.el)};
+      });
+      put(rows,controls.map(x=>x.row));put(preview);
+    };
     fn.onchange=render;render();
-    const add=h('button.primary','Add to pending changes');add.onclick=act(add,async()=>{const active=functions.find(f=>f.sig===fn.value),configs=Object.fromEntries(controls.map(x=>[x.field.path,{mode:x.mode.value,value:x.value.value,second:x.second.value}])),flat=buildConditions(active,configs,{ether:ether.value.trim(),call:calls.value.trim()});put(preview,h('h3','Condition preview'),conditionView(flat));mutate(ctx,s=>{const t=target(s,key,a);t.clearance=2;t.options=0;t.functions['0x'+active.selector]={selector:'0x'+active.selector,options:Number(options.value),conditions:flat};});close();},preview);
-    put(editor,h('label','Function'),fn,h('label','Execution options'),options,h('p.fhint','Every comparison is ABI encoded from the supplied function. Dynamic arrays apply their child condition to every element.'),rows,h('details',h('summary','Transaction allowances'),h('label','ETH allowance key'),ether,h('label','Call allowance key'),calls),h('div.actions',add),preview);
+    const add=h('button.primary','Add to pending changes');add.onclick=act(add,async()=>{const active=functions.find(f=>f.sig===fn.value),configs=Object.fromEntries(controls.map(x=>[x.field.path,{mode:x.mode.value,value:x.mode.value==='pass'||x.mode.value==='avatar'?'':x.value.get(),second:['oneof','between'].includes(x.mode.value)?x.second.get():''}])),flat=buildConditions(active,configs,{ether:ether.value.trim(),call:calls.value.trim()});put(preview,h('h3','Condition preview'),conditionView(flat));mutate(ctx,s=>{const t=target(s,key,a);t.clearance=2;t.options=0;t.functions['0x'+active.selector]={selector:'0x'+active.selector,options:Number(options.value),conditions:flat};});close();},preview);
+    put(editor,functions.length>1&&[h('label','Function'),fn],h('label','Execution options'),options,rows,h('details',h('summary','Transaction allowances'),h('label','ETH allowance key'),ether,h('label','Call allowance key'),calls),h('div.actions',add),preview);
   },out);
   if(pre.address)address.value=pre.address;
   if(pre.fn){put(body,h('p.mut.small','Conditions for ',h('code',pre.fn.sig),'. Saving replaces its current conditions.'),editor,out);load.onclick();return;}

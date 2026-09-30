@@ -649,3 +649,25 @@ button.link.addfn { padding: 0; font-size: 13px; }
 .fpick code.sig { min-width: 0; overflow-wrap: anywhere; }
 .fpick button { flex: none; white-space: nowrap; }
 @media (max-width: 600px) { .draftbar { gap: 10px; padding-left: 12px; font-size: 13px; } .draftbar button.primary { white-space: nowrap; } }
+/* Condition editor: one card per parameter, label / condition / value spaced; amounts with a unit. */
+.cfields { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.panel.cfield { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.cfield b .mut { font-weight: 400; }
+.amount .row { gap: 8px; }
+.amount .row input { flex: 1; min-width: 0; }
+select.unit { flex: none; width: auto; max-width: 48%; }
+.amount .fhint { margin: 6px 0 0; }
+.amount .fhint:empty { display: none; }
+pre.exact { max-height: 360px; overflow: auto; font-size: 12px; }
+/* Address suggestions (your labels) under an address input. */
+.combo { position: relative; }
+.combo > input { width: 100%; }
+.suggest { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; max-height: 232px; overflow-y: auto; display: flex; flex-direction: column; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
+.suggest[hidden] { display: none; }
+button.sopt { display: flex; align-items: baseline; gap: 10px; padding: 8px 10px; border: 0; border-radius: 6px; background: none; text-align: left; color: var(--fg); }
+button.sopt b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+button.sopt code { flex: none; color: var(--mut); font-size: 12px; }
+button.sopt:hover, button.sopt.on { background: var(--bg); }
+.suggest p { margin: 4px 10px 6px; }
+.dbody { overflow: visible; }
+.fhint.picked:empty { display: none; } .fhint.picked { margin: 6px 0 0; }
