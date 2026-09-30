@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scan } from '../../src/scan.js';
+import { clearScan, REORG_DEPTH, scan } from '../../src/scan.js';
 import { SETUP_TOPIC } from '../../src/roles.js';
 const address = '0x' + '12'.repeat(20);
 function setup(limit = 5000) {
@@ -21,7 +21,7 @@ test('adaptive windows, complete versus user-supplied partial history', async ()
   const partial = await scan(f.request, { address, chain: 1, block: 20, start: 15 });
   assert.equal(partial.complete, false); assert.equal(partial.caughtUp, true);
 });
-test('resume after bounded work and discard cache after reorg', async () => {
+test('resume after bounded work; after a reorg, rescan only the recent blocks', async () => {
   const f = setup();
   const first = await scan(f.request, { address, chain: 1, block: 10010, budget: 1 });
   assert.equal(first.last, 5009); assert.equal(first.complete, false);
@@ -29,7 +29,7 @@ test('resume after bounded work and discard cache after reorg', async () => {
   assert.equal(next.complete, true); assert.deepEqual(f.calls[1], [5010,10009]);
   f.reorg(); f.calls.length = 0;
   await scan(f.request, { address, chain: 1, block: 10010, budget: 1 });
-  assert.equal(f.calls[0][0], 10);
+  assert.equal(f.calls[0][0], 10010 - REORG_DEPTH + 1);
 });
 test('pause does not advance state and single-block limit failure terminates', async () => {
   const f = setup(0), controller = new AbortController(); controller.abort();
@@ -66,4 +66,20 @@ test('a start block typed by hand is complete when the scan contains the setup e
   assert.equal((await scan(f.request, { address, chain: 1, block: 100, start: 30 })).complete, true);
   const g = pruned(40);
   assert.equal((await scan(g.request, { address, chain: 1, block: 100, start: 50 })).complete, false, 'starting after the setup stays partial');
+});
+
+test('the deployment block is kept on its own: a reset scan does not search for it again', async () => {
+  const f = setup(); await scan(f.request, { address, chain: 1, block: 20 });
+  let asked = 0; const counting = async (m, p) => { if (m === 'eth_getCode') asked++; return f.request(m, p); };
+  clearScan(1, address);
+  const again = await scan(counting, { address, chain: 1, block: 20 });
+  assert.equal(again.start, 10); assert.equal(again.complete, true); assert.equal(asked, 0);
+});
+test('a reorged tip keeps the older events and rescans only the recent blocks', async () => {
+  const f = setup(); const first = await scan(f.request, { address, chain: 1, block: 3000 });
+  assert.equal(first.last, 3000);
+  f.reorg(); f.calls.length = 0;
+  const again = await scan(f.request, { address, chain: 1, block: 3000 });
+  assert.equal(again.complete, true);
+  assert.equal(f.calls[0][0], 3000 - REORG_DEPTH + 1, 'resumes right after the kept blocks, not from the deployment');
 });
