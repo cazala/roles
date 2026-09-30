@@ -6,7 +6,7 @@ import { add, discover, list, remembered, remember } from './wallets.js';
 import { connector, provider as wcProvider } from './wc.js';
 import { qr, qrPath } from './qr.js';
 import { addRpc, explorerKey, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } from './reads.js';
-import { resolveName } from './names.js';
+import { nameOf, resolveName } from './names.js';
 import { load, store } from './store.js';
 import * as labels from './labels.js';
 
@@ -53,8 +53,14 @@ let saved = load('saved', []);
 if (!Array.isArray(saved)) saved = [];
 saved = saved.filter(x => x && isAddr(x.address) && Number.isSafeInteger(x.chain));
 const save = () => store('saved', saved);
+// The account button: the chain, subtly, and the account by its .wei / ENS name when it has one (reverse-
+// resolved on Ethereum, forward-checked), else short.
+const accountName = {}; // account → its name (or null), looked up once per session
 function header() {
-  put($('connect'), session.account ? [h('span.net', network(session.chain)), short(session.account)] : 'Connect');
+  const a = session.account;
+  const who = () => [h('span.net', network(session.chain)), h('span.who', { title: a }, accountName[a] || short(a))];
+  put($('connect'), a ? who() : 'Connect');
+  if (a && session.chain === 1 && !(a in accountName)) nameOf(a, 1).then((n) => { accountName[a] = n; if (n && session.account === a) put($('connect'), who()); }, () => {});
 }
 async function connected(wallet) {
   const provider = wallet.provider;
@@ -89,23 +95,31 @@ function disconnect() {
   use(null); session.provider = null; session.account = null; session.chain = null; session.epoch++;
   remember('none'); continuation = null; header(); route();
 }
-/** Connect a wallet, or (connected) the account, chain switching for WalletConnect, other wallets, Disconnect. */
+// Account popover under the header button, as in safe.wei: the account menu, or the wallet list.
+const drop = $('drop');
+const closeDrop = () => put(drop);
+// pointerdown, not click: by the time a click bubbles up, the popover may have re-rendered.
+document.addEventListener('pointerdown', (e) => !e.target.closest('.acct') && closeDrop());
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closeDrop());
+function popover(view) {
+  const err = h('div');
+  const item = (label, fn) => h('button', { onclick: () => fn().catch((e) => put(err, h('p.bad', friendlyError(e)))) }, label);
+  const a = session.account, current = session.provider?.wallet;
+  if (view === 'menu') {
+    // A WalletConnect wallet does not drive the chain here: switch among the chains it approved.
+    const other = current === ownerWallet ? (ownerConn.session()?.chains || []).filter((c) => c !== session.chain) : [];
+    const name = (list().find((w) => w.provider === current) || {}).name || 'Wallet';
+    return put(drop, h('div.dropdown', h('div.head', h('div', h('b', name), h('div', accountName[a] ? accountName[a] + ' · ' + short(a) : short(a)), h('div', network(session.chain) + ' · chain ' + session.chain))),
+      other.map((c) => item('Switch to ' + network(c), async () => (closeDrop(), await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + c.toString(16) }])))),
+      item('Switch wallet', async () => popover('pick')), item('Disconnect', async () => (closeDrop(), disconnect())), err));
+  }
+  const ws = list().filter((w) => !a || w.provider !== current);
+  put(drop, h('div.dropdown', h('div.head', a && h('button.back', { onclick: () => popover('menu'), 'aria-label': 'Back' }, '‹'), a ? 'Switch wallet' : 'Connect a wallet'),
+    ws.length ? ws.map((w) => item(w.name, async () => (await connected(w), closeDrop()))) : h('div.empty', a ? 'No other wallet found.' : 'No wallet found. Install or enable a browser wallet, or use WalletConnect.'), err));
+}
 function walletDialog() {
-  const { body, close } = sheet('people', session.account ? 'Your wallet' : 'Connect a wallet');
-  const out = h('div');
-  const option = (title, sub, fn) => { const b = h('button.wopt', h('span.wtext', h('b', title), sub && h('span.mut', sub)), icon(...ICONS.next)); b.onclick = act(b, fn, out); return b; };
-  const wallets = list().filter((w) => !session.account || w.provider !== session.provider?.wallet);
-  const choices = wallets.map((w) => option(w.name, w.key === 'walletconnect' ? 'A wallet on your phone, by QR code' : 'Browser wallet', async () => { await connected(w); close(); }));
-  if (!session.account) return put(body, h('p.mut', 'roles.wei reads the chain and asks for signatures through the wallet you connect.'), h('div.wlist', choices), out);
-  const wc = session.provider?.wallet === ownerWallet, chains = wc ? (ownerConn.session()?.chains || []).filter((c) => c !== session.chain) : [];
-  put(
-    body,
-    h('div.wacct', h('span.mut.small', (wc ? peerName() + ' · ' : '') + network(session.chain)), addr(session.account)),
-    chains.length > 0 && [h('p.wsec', 'Network'), h('div.wlist', chains.map((c) => option('Switch to ' + network(c), null, async () => { await rpc('wallet_switchEthereumChain', [{ chainId: '0x' + c.toString(16) }]); close(); })))],
-    choices.length > 0 && [h('p.wsec', 'Switch wallet'), h('div.wlist', choices)],
-    out,
-    h('div.actions.wfoot', h('button', { onclick: () => (close(), disconnect()) }, 'Disconnect')),
-  );
+  if (drop.firstChild) return closeDrop();
+  popover(session.account ? 'menu' : 'pick');
 }
 $('connect').onclick = walletDialog;
 
