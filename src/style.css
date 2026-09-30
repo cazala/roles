@@ -592,3 +592,35 @@ code.cval { font-size: 12px; overflow-wrap: anywhere; }
 .tfoot input { width: 100%; margin-top: 6px; }
 .aname:not(:empty) { margin-left: 6px; font-size: 12px; }
 #connect .who { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The create wizard: a step bar, one step at a time, Back / Next in the footer. */
+.wizard { display: flex; flex-direction: column; min-height: 380px; }
+ol.wsteps { display: flex; gap: 6px; margin: 4px 0 16px; padding: 0; list-style: none; font-size: 13px; color: var(--mut); }
+ol.wsteps li { flex: 1; display: flex; align-items: center; gap: 6px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+ol.wsteps li span { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; font-size: 11px; }
+ol.wsteps li.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
+ol.wsteps li.on span { border-color: var(--fg); }
+ol.wsteps li.past { color: var(--fg); border-bottom-color: var(--mut); }
+.wpage { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.wpage > p { margin: 0; }
+.wpage label { margin: 8px 0 4px; color: var(--mut); font-size: 13px; }
+.wfoot { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.wcard { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); text-align: left; }
+.wcard > div:first-child { display: flex; align-items: center; gap: 8px; }
+.wcard p { margin: 0; font-size: 13px; }
+button.wpick { width: 100%; cursor: pointer; }
+button.wpick:hover { border-color: var(--mut); }
+button.wpick.on { border-color: var(--fg); }
+.wradio { flex: none; box-sizing: border-box; width: 16px; height: 16px; border: 1.5px solid var(--mut); border-radius: 50%; }
+button.wpick.on .wradio { border-color: var(--fg); background: radial-gradient(circle, var(--fg) 0 3.5px, transparent 4px); }
+.wtag { padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--mut); font-size: 11px; font-weight: 500; }
+details.wcustom { margin: 0; }
+.wrow { display: flex; flex-direction: column; gap: 1px; }
+.wrow + .wrow { margin-top: 6px; }
+.wrow > span:first-child { font-size: 12px; }
+.wrow .addr code { font-size: 12.5px; }
+ol.wcalls { margin: 0; padding-left: 20px; font-size: 14px; }
+ol.wcalls li + li { margin-top: 4px; }
+ol.wprogress { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.wdone { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--ok); border-radius: 12px; }
+.wdone p { margin: 0; }
+@media (max-width: 600px) { ol.wsteps li { font-size: 0; gap: 0; } ol.wsteps li.on { font-size: 13px; gap: 6px; } }
