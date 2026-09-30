@@ -1,4 +1,4 @@
-import { $, h, put, addr, bad, warn, act, sheet, copyButton, short } from './ui.js';
+import { $, h, put, addr, bad, warn, act, sheet, copyButton, short, friendlyError } from './ui.js';
 import * as labels from './labels.js';
 import { KNOWN_IDS, label } from './chains.js';
 import { parseAbi } from './abicoder.js';
@@ -177,7 +177,7 @@ function changesText(ctx,d,calls) {
   return lines.join('\n');
 }
 export function review(ctx) {
-  const d=draft(ctx),calls=diff(d.base,d.value,ctx.address),{body,close}=sheet('people','Review changes',true),out=h('div');
+  const d=draft(ctx),calls=diff(d.base,d.value,ctx.address),{body,close}=sheet('people','Review changes',true);
   body.classList.add('fulladdr');
   const risky=calls.filter(c=>c.danger).length;
   const card=(c,i)=>{const ps=params(c);return h('section.rvcall',h('div.rvtop',h('span.rvnum',String(i+1)),h('b',ACTION[c.signature.split('(')[0]]||c.text),c.danger&&h('span.chip.warn','Widens access')),
@@ -193,18 +193,33 @@ export function review(ctx) {
   if(!supported){body.append(warn('This modifier owner is neither the connected wallet nor a readable Safe. Review the calls above, then use a tool that can act for '+d.base.owner+'.'),h('div.actions.rvfoot',copyAll));return;}
   const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:load('gateway','https://safe.wei.limo/')});
   const nonce=h('input',{'aria-label':'Safe nonce',placeholder:'Current Safe nonce',inputmode:'numeric'});
-  const apply=h('button.primary',direct?'Apply changes':'Prepare safe.wei link');
-  let running=false;
-  apply.onclick=act(apply,async()=>{
-    if(running)return;running=true;
+  const foot=h('div.actions.rvfoot'),out=h('div');
+  if(direct) {
+    const apply=h('button.primary','Apply changes');
+    apply.onclick=act(apply,async()=>{await preflight(ctx,d);await directApply(ctx,d,text=>put(out,h('p',text)));drafts.delete(id(ctx));close();ctx.refresh();},out);
+    put(foot,apply,copyAll);body.append(foot,out);return;
+  }
+  // A Safe owns the modifier: the safe.wei link is prepared right away (checked against the Safe's own
+  // transaction hash), and again when the hand-off options change; one row of actions once it is ready.
+  let seq=0;
+  const prepare=async()=>{
+    const mine=++seq;
+    put(foot,h('span.rvwait',h('span.spin'),'Preparing the safe.wei link…'),copyAll);put(out);
     try {
       await preflight(ctx,d);
-      if(direct) {await directApply(ctx,d,text=>put(out,h('p',text)));drafts.delete(id(ctx));close();ctx.refresh();}
-      else {const base=gateway(gatewayInput.value);const result=await proposal(ctx.request,ctx.chain,d.base.owner,calls,base,nonce.value);store('gateway',base);apply.classList.remove('primary');put(out,h('p','Send this link to the owners. Execution happens in safe.wei.'),h('a.btn.primary',{href:result.url,target:'_blank',rel:'noopener'},'Open in safe.wei to approve'),copyButton('Copy link',result.url));}
-    } finally {running=false;}
-  },out);
-  if (!direct) body.append(h('details',h('summary','Safe hand-off options'),h('label','safe.wei gateway'),gatewayInput,h('label','Safe nonce (current or later)'),nonce));
-  body.append(h('div.actions.rvfoot',apply,copyAll),out);
+      const base=gateway(gatewayInput.value),result=await proposal(ctx.request,ctx.chain,d.base.owner,calls,base,nonce.value);
+      if(mine!==seq)return;
+      store('gateway',base);
+      put(foot,h('a.btn.primary',{href:result.url,target:'_blank',rel:'noopener'},'Open in safe.wei to approve'),copyButton('Copy link',result.url),copyAll);
+      put(out,h('p.mut.small.rvsend','Send the link to the Safe’s owners: they check it, sign and execute it in safe.wei.'));
+    } catch(e) {
+      if(mine!==seq)return;
+      put(foot,h('button',{onclick:prepare},'Try again'),copyAll);put(out,bad(friendlyError(e)));
+    }
+  };
+  gatewayInput.onchange=nonce.onchange=prepare;
+  body.append(h('details',h('summary','Safe hand-off options'),h('label','safe.wei gateway'),gatewayInput,h('label','Safe nonce (current or later)'),nonce),foot,out);
+  prepare();
 }
 export function editBody(ctx,path) {
   if(!ctx.complete||ctx.info.faulty)return null;
