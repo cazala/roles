@@ -22,7 +22,7 @@ const pastedKey = (chain, address) => 'abi:' + chain + ':' + address, nameKey = 
 
 
 /** Names for a target: { name, source, fns: Map(selector → function) }. Your ABI, else Etherscan's, else standard ones. */
-async function namesFor(chain, address) {
+export async function namesFor(chain, address) {
   const fns = new Map(), add = (list) => list.forEach((f) => f.selector && !fns.has(f.selector) && fns.set(f.selector, f));
   let name = load(nameKey(chain, address), '') || null, source = null, missing = null, explorer = false;
   const pasted = load(pastedKey(chain, address), '');
@@ -69,15 +69,18 @@ function value(node, type, ctx) {
   }
   return [h('code.cval', v), v.length > 66 && copy(v, 'Copy value')];
 }
-const row = (name, type, op, val) => h('div.crow', h('span.cname', name), h('span.ctype', type), h('span.cop' + (op === 'any value' ? '.mut' : ''), op), h('span.cvalue', val || ''));
+// While a table renders, the top-level parameter its rows belong to (so a click edits that parameter).
+let at = null;
+const row = (name, type, op, val) => h('div.crow', { 'data-at': at }, h('span.cname', name), h('span.ctype', type), h('span.cop' + (op === 'any value' ? '.mut' : ''), op), h('span.cvalue', val || ''));
 const element = (p) => ({ name: (p.name || 'element') + ' element', type: p.type.replace(/\[\d*\]$/, ''), components: p.components });
 function node(n, p, ctx) {
   const op = n.operator, name = p.name || 'Parameter', type = p.type || TYPES[n.paramType];
   if (GROUP[op]) return h('div.cgroup', h('span.clabel', h('span', GROUP[op])), h('div.cgbody', n.children.map((c) => node(c, p, ctx))));
   if (op === 5) {
     const parts = p.inputs || p.components || [], label = p.inputs ? 'Parameter ' : 'Field ';
-    const kids = n.children.map((c, i) => node(c, { ...(parts[i] || {}), name: (parts[i] && parts[i].name) || label + (i + 1) }, ctx));
-    const rest = parts.slice(n.children.length).map((q, i) => row(q.name || label + (n.children.length + i + 1), q.type, 'any value'));
+    const top = !!p.inputs, outer = at;
+    const kids = n.children.map((c, i) => { if (top) at = [29, 30].includes(c.operator) ? null : i; const r = node(c, { ...(parts[i] || {}), name: (parts[i] && parts[i].name) || label + (i + 1) }, ctx); if (top) at = outer; return r; });
+    const rest = parts.slice(n.children.length).map((q, i) => { if (top) at = n.children.length + i; const r = row(q.name || label + (n.children.length + i + 1), q.type, 'any value'); if (top) at = outer; return r; });
     return p.inputs ? h('div.cparts', kids, rest) : h('div.cnest', row(name, type, 'matches', null), h('div.cparts', kids, rest));
   }
   if (op === 6 || op === 7 || op === 8) {
@@ -89,10 +92,12 @@ function node(n, p, ctx) {
   if (op === 30) return row('Calls', '', 'are within allowance', allowance);
   return row(name, type, OPS[op] || 'operator ' + op, value(n, p.type, ctx));
 }
-export function conditionTable(flat, f, ctx) {
+/** The condition table; with `onEdit`, a click on a parameter's row edits that parameter (onEdit(index)). */
+export function conditionTable(flat, f, ctx, onEdit) {
   try {
     const root = toTree(flat);
-    return h('div.ctable', h('div.crow.chead', h('span', 'Parameter'), h('span', 'Type'), h('span', 'Condition'), h('span', 'Value')), node(root, { inputs: f ? f.inputs : null, name: 'Call data' }, ctx));
+    at = null;
+    return h('div.ctable' + (onEdit ? '.editable' : ''), { title: onEdit ? 'Click a parameter to edit its condition' : null, onclick: onEdit && ((e) => { const r = e.target.closest('.crow[data-at]'); if (r && !e.target.closest('button, a')) onEdit(Number(r.dataset.at)); }) }, h('div.crow.chead', h('span', 'Parameter'), h('span', 'Type'), h('span', 'Condition'), h('span', 'Value')), node(root, { inputs: f ? f.inputs : null, name: 'Call data' }, ctx));
   } catch (e) {
     return h('div', warn(e.message), h('pre', json(flat)));
   }
@@ -119,7 +124,7 @@ function fnView(fn, f, t, ctx, m) {
       ed && ['Revoke function', () => ed.revokeFn(t, fn), true],
     ], 'Function actions');
   return h('div.fn' + (m ? '.pend' : '') + (m === 'gone' ? '.gone' : ''), h('div.fnhead', signature(f, s), h('span.chip.mono', '0x' + s), chips(fn.options), markChip(m), h('span.grow'), actions),
-    m !== 'gone' && [t.clearance !== 2 && warn('Dormant: the target allows all functions, or is revoked.'), fn.conditions ? conditionTable(fn.conditions, f, ctx) : h('p.mut.fnfree', 'Any parameters.')]);
+    m !== 'gone' && [t.clearance !== 2 && warn('Dormant: the target allows all functions, or is revoked.'), fn.conditions ? conditionTable(fn.conditions, f, ctx, ed && f && ((i) => ed.conditions(t, fn, f, i))) : h('p.mut.fnfree', 'Any parameters.', ed && f && f.inputs.length > 0 && [' ', h('button.link', { onclick: () => ed.conditions(t, fn, f) }, 'Add conditions')])]);
 }
 /** The conditions exactly as stored onchain (the flat list the contract checks), to read or copy. */
 function exact(fn, f, s) {

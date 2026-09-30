@@ -1,9 +1,10 @@
-import { $, h, put, addr, bad, warn, act, sheet, copyButton, short, friendlyError } from './ui.js';
+import { $, h, put, addr, bad, warn, act, sheet, copyButton, short, friendlyError, toClipboard } from './ui.js';
 import * as labels from './labels.js';
 import { KNOWN_IDS, label } from './chains.js';
 import { parseAbi } from './abicoder.js';
 import { session } from './app.js';
 import { roleView, body as readBody } from './views.js';
+import { namesFor } from './role-view.js';
 import { diff, SIG } from './diff.js';
 import { roleKey, keyName, role, target, json, signature, decodeEvent, replay, quantity, metadata } from './roles.js';
 import { isAddr, ZERO } from './abi.js';
@@ -95,7 +96,7 @@ function edits(ctx,key) {
     revokeTarget:t=>mutate(ctx,on(t,x=>{x.clearance=0;x.options=0;})),
     restoreTarget:t=>mutate(ctx,s=>{role(s,key).targets[t.address]=structuredClone(base().targets[t.address]);}),
     addFunction:(t,names)=>addFunction(ctx,key,t,names),
-    conditions:(t,fn,f)=>editorHooks.conditions&&editorHooks.conditions(ctx,key,{address:t.address,fn:f,options:fn.options}),
+    conditions:(t,fn,f,focus)=>editorHooks.conditions&&editorHooks.conditions(ctx,key,{address:t.address,fn:f,options:fn.options,focus}),
     allowAny:(t,fn)=>mutate(ctx,on(t,x=>{x.functions[fn.selector].conditions=null;})),
     fnOptions:(t,fn)=>optionsForm('Execution options',fn.options,o=>mutate(ctx,on(t,x=>{x.functions[fn.selector].options=o;}))),
     revokeFn:(t,fn)=>mutate(ctx,on(t,x=>{delete x.functions[fn.selector];})),
@@ -151,9 +152,11 @@ const ACTION={assignRoles:'Change membership',setDefaultRole:'Set default role',
 const OPTION_TEXT=['CALL, no ETH','CALL with ETH','CALL or DELEGATECALL, no ETH','CALL or DELEGATECALL with ETH'];
 const chainText=c=>KNOWN_IDS.includes(c)?label(c).name:'Chain ID: '+c;
 const params=c=>parseAbi(c.signature)[0].inputs;
+const callTarget=c=>{const i=params(c).findIndex(p=>p.name==='targetAddress');return i<0?null:c.args[i];};
 /** One parameter as text (for Copy changes): addresses with your label, role keys with their name. */
-function argText(p,v) {
-  if(p.type==='address')return v+(labels.get(v)?' ('+labels.get(v)+')':'');
+function argText(p,v,n) {
+  if(p.type==='address')return v+(labels.get(v)?' ('+labels.get(v)+')':n?.name?' ('+n.name+')':'');
+  if(p.type==='bytes4'&&n?.fns.get(v.slice(2)))return v+' ('+n.fns.get(v.slice(2)).sig+')';
   if(p.type==='bytes32')return v+(keyName(v)!==v?' ('+keyName(v)+')':'');
   if(p.type==='bytes32[]')return v.map(k=>keyName(k)).join(', ');
   if(p.name==='options')return v+' ('+OPTION_TEXT[Number(v)]+')';
@@ -161,8 +164,10 @@ function argText(p,v) {
   return Array.isArray(v)?v.map(String).join(', '):String(v);
 }
 /** One parameter as UI: full addresses (this is what gets signed), role keys by name, options in words. */
-function argView(p,v) {
-  if(p.type==='address')return addr(v);
+function argView(p,v,n) {
+  // `n`: the call's target names (a promise): its contract name next to the target, the function by its selector.
+  if(p.type==='address'){const tag=h('span.mut.aname');if(p.name==='targetAddress')n.then(x=>x?.name&&!labels.get(v)&&put(tag,x.name));return [addr(v),tag];}
+  if(p.type==='bytes4'){const tag=h('span.mut.aname');n.then(x=>{const f=x?.fns.get(v.slice(2));if(f)put(tag,f.name+'('+f.inputs.map(i=>i.type).join(', ')+')');});return [h('code',v),tag];}
   if(p.type==='bytes32')return keyName(v)!==v?h('span',{title:v},keyName(v)):h('code',v);
   if(p.type==='bytes32[]')return v.map(k=>keyName(k)).join(', ');
   if(p.type==='bool[]')return v.map(x=>x?'add':'remove').join(', ');
@@ -171,24 +176,27 @@ function argView(p,v) {
   return h('code',Array.isArray(v)?v.map(String).join(', '):String(v));
 }
 /** Every call as plain text, to paste to a reviewer (a person or an agent): what, in order, with calldata. */
-function changesText(ctx,d,calls) {
+function changesText(ctx,d,calls,names) {
   const lines=['Zodiac Roles modifier changes for review','Modifier: '+ctx.address+' (Roles '+ctx.info.version+')','Chain: '+chainText(ctx.chain)+' (chain ID '+ctx.chain+')','Owner: '+d.base.owner+(labels.get(d.base.owner)?' ('+labels.get(d.base.owner)+')':''),'',calls.length+' call'+(calls.length===1?'':'s')+' to the modifier, applied in this order:'];
-  calls.forEach((c,i)=>{const ps=params(c);lines.push('',(i+1)+'. '+(ACTION[c.signature.split('(')[0]]||c.text)+(c.danger?' [widens access]':''),'   '+c.text,'   '+c.signature,...ps.map((p,j)=>'   '+p.name+': '+argText(p,c.args[j]).replace(/\n/g,'\n   ')),'   to: '+c.to,'   data: '+c.data);});
+  calls.forEach((c,i)=>{const ps=params(c);lines.push('',(i+1)+'. '+(ACTION[c.signature.split('(')[0]]||c.text)+(c.danger?' [widens access]':''),'   '+c.text,'   '+c.signature,...ps.map((p,j)=>'   '+p.name+': '+argText(p,c.args[j],names[callTarget(c)]).replace(/\n/g,'\n   ')),'   to: '+c.to,'   data: '+c.data);});
   return lines.join('\n');
 }
 export function review(ctx) {
   const d=draft(ctx),calls=diff(d.base,d.value,ctx.address),{body,close}=sheet('people','Review changes',true);
   body.classList.add('fulladdr');
   const risky=calls.filter(c=>c.danger).length;
-  const card=(c,i)=>{const ps=params(c);return h('section.rvcall',h('div.rvtop',h('span.rvnum',String(i+1)),h('b',ACTION[c.signature.split('(')[0]]||c.text),c.danger&&h('span.chip.warn','Widens access')),
-    h('table.kv.rvargs',ps.map((p,j)=>h('tr',h('th',p.name),h('td',argView(p,c.args[j]))))),
+  // Names for each target (your ABI, Etherscan's, standard interfaces; each matched by its selector).
+  const names={},loading=Object.fromEntries([...new Set(calls.map(callTarget).filter(Boolean))].map(a=>[a,namesFor(ctx.chain,a).then(n=>(names[a]=n),()=>null)]));
+  const card=(c,i)=>{const ps=params(c),n=loading[callTarget(c)]||Promise.resolve(null);return h('section.rvcall',h('div.rvtop',h('span.rvnum',String(i+1)),h('b',ACTION[c.signature.split('(')[0]]||c.text),c.danger&&h('span.chip.warn','Widens access')),
+    h('table.kv.rvargs',ps.map((p,j)=>h('tr',h('th',p.name),h('td',argView(p,c.args[j],n))))),
     h('details.rvraw',h('summary','Calldata'),h('code.sig',c.signature),h('pre',c.data)));};
   put(body,h('div.rvhead',h('div',h('span.mut','Modifier'),addr(ctx.address)),h('div',h('span.mut','Chain'),h('span.chip',chainText(ctx.chain)))),
     calls.length>0&&h('p.mut.small.rvnote',calls.length+' call'+(calls.length===1?'':'s')+' to the modifier, applied in this order.'),
     risky>0&&warn((risky===1?'One change widens':risky+' changes widen')+' access to the Safe’s assets. Review every address and parameter.'),
     h('div.rvcalls',calls.map(card)));
   if(!calls.length){body.append(h('p','No onchain changes.'));return;}
-  const copyAll=copyButton('Copy changes',changesText(ctx,d,calls));copyAll.title='Every call as text, with calldata, to paste to a reviewer';
+  const copyAll=h('button',{title:'Every call as text, with calldata, to paste to a reviewer'},'Copy changes');
+  copyAll.onclick=async()=>{await Promise.all(Object.values(loading));toClipboard(changesText(ctx,d,calls,names)).then(()=>{put(copyAll,'✓ Copied');setTimeout(()=>put(copyAll,'Copy changes'),1500);},()=>{});};
   const direct=d.base.owner===session.account, supported=direct||ctx.ownerSafe;
   if(!supported){body.append(warn('This modifier owner is neither the connected wallet nor a readable Safe. Review the calls above, then use a tool that can act for '+d.base.owner+'.'),h('div.actions.rvfoot',copyAll));return;}
   const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:load('gateway','https://safe.wei.limo/')});
