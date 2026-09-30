@@ -71,7 +71,7 @@ export async function renderAddress(address, path, epoch) {
   };
   // While a scan runs block by block, point to the fast path: an Etherscan key loads it in a few requests.
   const tip = () => !explorerKey() && !request.wide && [h('a.hint', { href: '#', title: 'An Etherscan API key loads the history in a few requests instead of scanning block by block', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Add an Etherscan key'), ' to load instantly'];
-  const start = h('input', { 'aria-label': 'Start block', placeholder: 'Deployment block (automatic)', inputmode: 'numeric' });
+  const start = h('input', { 'aria-label': 'Start block', placeholder: 'Automatic', inputmode: 'numeric' });
   let controller, scanning = false, last = null;
   const run = async () => {
     if (scanning) return; scanning = true; menu.hidden = true;
@@ -120,7 +120,7 @@ export async function renderAddress(address, path, epoch) {
   const restart = () => { controller?.abort(); clearScan(chain, address); put(content); scanning = false; run(); };
   put(menu,
     h('label', 'Start from block'), h('div.row', start, button('Apply', restart)), h('p.mut.small', 'Leave empty for the complete history. A later start is read-only.'),
-    h('button.link.sclear', { onclick: restart }, 'Clear cached history and scan again'));
+    h('hr'), h('button.sclear', { onclick: restart }, 'Clear cached history and scan again'));
   const closeMenu = (e) => (bar.isConnected ? !bar.querySelector('.smore').contains(e.target) && (menu.hidden = true) : removeEventListener('pointerdown', closeMenu));
   addEventListener('pointerdown', closeMenu); // a tap anywhere else closes the menu
   root.append(bar, content);
