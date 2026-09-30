@@ -34,3 +34,35 @@ test('allowance boundaries, cap, no refill, excess balance and overflow', () => 
   assert.equal(accrued(a,990n).timestamp,1000n);
   assert.throws(()=>accrued({...a,refill:(1n<<128n)-1n},2000n), /overflows/);
 });
+test('stored conditions read back into editor fields, and rebuild unchanged', async () => {
+  const { readConditions } = await import('../../src/condition-builder.js');
+  const [fn]=parseAbi('approve(address spender,uint256 amount)');
+  const A='0x1111111111111111111111111111111111111111',B='0x2222222222222222222222222222222222222222',C='0x3333333333333333333333333333333333333333';
+  for (const configs of [
+    {spender:{mode:'oneof',values:[A,B,C]},amount:{mode:'pass'}},
+    {spender:{mode:'equal',value:A},amount:{mode:'between',value:'5',second:'1000'}},
+    {spender:{mode:'avatar'},amount:{mode:'less',value:'1500000000000000000'}},
+    {spender:{mode:'pass'},amount:{mode:'allowance',value:'daily'}},
+  ]) {
+    const flat=buildConditions(fn,configs,{ether:'eth-limit'});
+    const read=readConditions(fn,flat);
+    assert.deepEqual(read.configs,configs);
+    assert.equal(read.extras.ether,'eth-limit');
+    assert.deepEqual(buildConditions(fn,read.configs,read.extras),flat);
+  }
+});
+test('conditions the editor cannot express are kept exactly as stored', async () => {
+  const { readConditions } = await import('../../src/condition-builder.js');
+  const [fn]=parseAbi('approve(address spender,uint256 amount)');
+  // amount matches a bitmask (21): not editable here, so it is kept verbatim while spender is edited.
+  const mask={parent:1,paramType:1,operator:21,compValue:'0x'+'00'.repeat(31)+'ff'};
+  const flat=[{parent:0,paramType:5,operator:5,compValue:'0x'},{parent:0,paramType:1,operator:15,compValue:'0x'},{...mask,parent:0}];
+  const read=readConditions(fn,flat);
+  assert.deepEqual(read.kept,['amount']);
+  assert.deepEqual(buildConditions(fn,read.configs),flat);
+  const edited=buildConditions(fn,{...read.configs,spender:{mode:'pass'}});
+  assert.deepEqual(edited[2],flat[2]);
+  assert.equal(edited[1].operator,0);
+  // A root the editor does not build (an OR of two Matches) is unreadable as a whole.
+  assert.equal(readConditions(fn,[{parent:0,paramType:0,operator:2,compValue:'0x'}]).unreadable,true);
+});
