@@ -599,3 +599,4 @@ code.cval { font-size: 12px; overflow-wrap: anywhere; }
   .cnest > .cparts { margin-left: 10px; }
 }
 .tfoot input { width: 100%; margin-top: 6px; }
+.aname:not(:empty) { margin-left: 6px; font-size: 12px; }

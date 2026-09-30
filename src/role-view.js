@@ -41,19 +41,27 @@ async function namesFor(chain, address) {
   return { name, source, fns, missing };
 }
 
+// An address with its contract name next to it, muted, when an Etherscan key is set and the contract is
+// verified there (wallets have none). The address stays: the name is a hint from Etherscan, not a claim we check.
+function named(chain, a) {
+  const tag = h('span.mut.aname');
+  if (explorerKey()) explorerSource(explorerKey(), chain, a).then((s) => s.name && put(tag, s.name), () => {});
+  return [addr(a), tag];
+}
+
 // ---- conditions: a table of parameters, logical groups as labelled brackets ----
 const OPS = { 0: 'any value', 15: 'is the avatar', 16: 'is equal to', 17: 'is greater than', 18: 'is less than', 19: 'is greater than (signed)', 20: 'is less than (signed)', 21: 'matches the bitmask', 22: 'passes a custom check', 28: 'is within allowance' };
 const GROUP = { 1: 'AND', 2: 'OR', 3: 'NOR' };
 const signed = (v) => { const n = BigInt(v); return (n >> 255n ? n - (1n << 256n) : n).toString(); };
 function value(node, type, ctx) {
   const v = node.compValue, op = node.operator;
-  if (op === 15) return addr(ctx.meta.avatar);
+  if (op === 15) return named(ctx.chain, ctx.meta.avatar);
   if (op === 28) return h('a', { href: '#/' + ctx.address + '/allowances' }, keyName(v));
   if (!v || v === '0x') return null;
   if (op === 17 || op === 18) return BigInt(v).toString();
   if (op === 19 || op === 20) return signed(v);
   if (op === 16 && v.length === 66 && type) {
-    if (type === 'address' && /^0x0{24}/.test(v)) return addr('0x' + v.slice(26));
+    if (type === 'address' && /^0x0{24}/.test(v)) return named(ctx.chain, '0x' + v.slice(26));
     if (/^uint\d*$/.test(type)) return BigInt(v).toString();
     if (/^int\d*$/.test(type)) return signed(v);
     if (type === 'bool' && /^0x0{63}[01]$/.test(v)) return v.endsWith('1') ? 'true' : 'false';
@@ -136,7 +144,7 @@ export function roleView(ctx, key) {
   const show = (which) => {
     put(tabs, [['permissions', 'Permissions · ' + targets.length], ['members', 'Members · ' + members.length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)));
     put(content, which === 'members'
-      ? members.length ? h('div.slist', members.map((a) => h('div.srow', addr(a), !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'), ctx.state.defaults[a] === key && h('span.chip', 'Default role')))) : h('p.empty', 'No members assigned.')
+      ? members.length ? h('div.slist', members.map((a) => h('div.srow', named(ctx.chain, a), !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'), ctx.state.defaults[a] === key && h('span.chip', 'Default role')))) : h('p.empty', 'No members assigned.')
       : targets.length ? targets.map((t) => targetView(t, ctx)) : h('p.empty', 'No targets configured for this role.'));
   };
   show('permissions');
