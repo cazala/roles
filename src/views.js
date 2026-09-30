@@ -23,12 +23,20 @@ export function body(ctx, path) {
   if (path[0] === 'allowances') return hooks.allowances ? hooks.allowances(ctx) : h('div', h('h2', 'Allowances'), Object.keys(ctx.state.allowances).length ? h('pre', json(ctx.state.allowances)) : h('p.mut', 'No allowances in the scanned history.'));
   return rolesPage(ctx);
 }
+// A Roles modifier read in this session, by chain, address and account: moving between its pages (roles, a
+// role, allowances) renders from memory. Refresh, Apply, a Settings change or another wallet, account or chain
+// reads it again.
+const loaded = new Map();
+export const forget = () => loaded.clear();
+const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
 export async function renderAddress(address, path, epoch) {
   const provider = session.provider, chain = session.chain;
   const request = async (method, params = []) => { if (epoch !== session.epoch) throw Error('Wallet or page changed.'); const value = await provider.request({ method, params }); if (epoch !== session.epoch) throw Error('Wallet or page changed.'); return value; };
   Object.defineProperty(request, 'wide', { get: () => !!provider.wide }); // Etherscan in use: whole log ranges at once
-  const snapshot = await request('eth_getBlockByNumber', ['latest', false]);
-  const info = await identify(request, address, snapshot.number);
+  const k = chain + ':' + address + ':' + session.account, hit = loaded.get(k);
+  const refresh = () => { loaded.delete(k); route(); };
+  const snapshot = hit ? hit.snapshot : await request('eth_getBlockByNumber', ['latest', false]);
+  const info = hit ? hit.info : await identify(request, address, snapshot.number);
   if (info.code === '0x') throw Error('No contract at this address on the connected chain.');
   if (!info.version) {
     const safe = await safeModules(request, address, snapshot.number);
@@ -39,9 +47,9 @@ export async function renderAddress(address, path, epoch) {
     }));
     return h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), hooks.create && hooks.create({ address, safe, request, snapshot, chain }), modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'));
   }
-  const meta = await metadata(request, address, snapshot.number);
-  let ownerSafe=false;
-  if(meta.owner!==session.account)try{await safeModules(request,meta.owner,snapshot.number);ownerSafe=true;}catch{}
+  const meta = hit ? hit.meta : await metadata(request, address, snapshot.number);
+  let ownerSafe = hit ? hit.ownerSafe : false;
+  if(!hit&&meta.owner!==session.account)try{await safeModules(request,meta.owner,snapshot.number);ownerSafe=true;}catch{}
   const ownerSupported=meta.owner===session.account||ownerSafe;
   const root = h('div', h('h1', 'Roles ' + info.version), addr(address), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), !ownerSupported&&warn('This owner is neither the connected wallet nor a readable Safe. You can inspect permissions and prepare calls, but roles.wei cannot submit them for this owner.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
   if (!info.supported) { root.append(h('p.mut', 'This implementation is identified but is not supported for permission decoding or editing.'), h('details', h('summary', 'Implementation'), addr(info.implementation), h('pre', info.code))); return root; }
@@ -92,10 +100,11 @@ export async function renderAddress(address, path, epoch) {
       const state = replay(result.logs);
       if (result.caughtUp && result.hash !== snapshot.hash) throw Error('Snapshot changed during scan. Refresh the page.');
       if (result.complete && ['owner', 'avatar', 'target'].some(k => state[k] !== meta[k])) throw Error('History does not match current contract metadata. Clear the cached history and scan again before editing.');
-      const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, ownerSafe, refresh: route };
+      const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, ownerSafe, refresh };
       const span = ' · blocks ' + num(result.start) + ' – ' + num(result.last) + (provider.source ? ' · read through ' + provider.source : '');
-      if (result.complete) show('done', 'Complete history' + span, button('Refresh', () => route()));
-      else show('partial', 'Partial history, from a start block you chose · editing disabled' + span, button('Refresh', () => route()));
+      const kind = result.complete ? 'done' : 'partial', words = (result.complete ? 'Complete history' : 'Partial history, from a start block you chose · editing disabled') + span;
+      show(kind, words, button('Refresh', refresh));
+      loaded.set(k, { snapshot, info, meta, ownerSafe, state, complete: result.complete, kind, words, at: Date.now() });
       put(content, body(ctx, path));
     } catch (e) {
       if (epoch !== session.epoch || controller !== mine) return;
@@ -111,13 +120,16 @@ export async function renderAddress(address, path, epoch) {
     }
     finally { if (controller === mine) scanning = false; }
   };
-  const restart = () => { controller?.abort(); clearScan(chain, address); put(content); scanning = false; run(); };
+  const restart = () => { controller?.abort(); loaded.delete(k); clearScan(chain, address); put(content); scanning = false; run(); };
   put(menu,
     h('label', 'Start from block'), h('div.row', start, button('Apply', restart)), h('p.mut.small', 'Leave empty for the complete history. A later start is read-only.'),
     h('hr'), h('button.sclear', { onclick: restart }, 'Clear cached history and scan again'));
   const closeMenu = (e) => (bar.isConnected ? !bar.querySelector('.smore').contains(e.target) && (menu.hidden = true) : removeEventListener('pointerdown', closeMenu));
   addEventListener('pointerdown', closeMenu); // a tap anywhere else closes the menu
   root.append(bar, content);
-  run();
+  if (hit) {
+    show(hit.kind, hit.words + ' · read ' + ago(hit.at), button('Refresh', refresh));
+    put(content, body({ address, chain, info, meta, state: hit.state, request, snapshot, complete: hit.complete, ownerSafe, refresh }, path));
+  } else run();
   return root;
 }
