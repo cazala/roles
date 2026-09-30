@@ -671,3 +671,8 @@ button.sopt:hover, button.sopt.on { background: var(--bg); }
 .suggest p { margin: 4px 10px 6px; }
 .dbody { overflow: visible; }
 .fhint.picked:empty { display: none; } .fhint.picked { margin: 6px 0 0; }
+/* Review changes: the modifier and its chain, one per line. */
+.rvhead { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; }
+.rvhead > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rvhead > div > .mut { flex: none; width: 64px; font-size: 13px; }
+.rvhead .addr { min-width: 0; overflow-wrap: anywhere; }

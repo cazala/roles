@@ -1,5 +1,6 @@
 import { $, h, put, addr, bad, warn, act, sheet, copyButton, short } from './ui.js';
 import * as labels from './labels.js';
+import { KNOWN_IDS, label } from './chains.js';
 import { parseAbi } from './abicoder.js';
 import { session } from './app.js';
 import { roleView, body as readBody } from './views.js';
@@ -148,7 +149,7 @@ export async function directApply(ctx,d,status) {
 export function review(ctx) {
   const d=draft(ctx),calls=diff(d.base,d.value,ctx.address),{body,close}=sheet('people','Review changes',true),out=h('div');
   body.classList.add('fulladdr');
-  put(body,h('p','Modifier ',addr(ctx.address), ' · Chain '+ctx.chain),calls.map(c=>h('div.panel',h('b',c.text),c.danger&&warn('This changes access to the Safe’s assets. Review every address and parameter.'),h('pre',json(c.args)),h('details',h('summary','Calldata and signature'),h('code',c.signature),h('pre',c.data)))));
+  put(body,h('div.rvhead',h('div',h('span.mut','Modifier'),addr(ctx.address)),h('div',h('span.mut','Chain'),h('span.chip',KNOWN_IDS.includes(ctx.chain)?label(ctx.chain).name:'Chain ID: '+ctx.chain))),calls.map(c=>h('div.panel',h('b',c.text),c.danger&&warn('This changes access to the Safe’s assets. Review every address and parameter.'),h('pre',json(c.args)),h('details',h('summary','Calldata and signature'),h('code',c.signature),h('pre',c.data)))));
   if(!calls.length){body.append(h('p','No onchain changes.'));return;}
   const direct=d.base.owner===session.account, supported=direct||ctx.ownerSafe;
   if(!supported){body.append(warn('This modifier owner is neither the connected wallet nor a readable Safe. Review the calls above, then use a tool that can act for '+d.base.owner+'.'));return;}
