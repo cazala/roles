@@ -579,3 +579,15 @@ p.asum:empty { display: none; }
 .mrow .rmain .small a { color: var(--fg); }
 .srow.rrow.pend { box-shadow: inset 3px 0 0 #c98a00; }
 details.msettings { margin-top: 18px; }
+/* Members view: each member's roles as chips (the default one marked); the roles dialog's checkboxes. */
+.mroles { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+a.rolechip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--fg); font-size: 12px; text-decoration: none; }
+a.rolechip:hover { border-color: var(--mut); }
+a.rolechip.def { border-color: var(--fg); }
+a.rolechip span { color: var(--mut); font-size: 11px; }
+.srow.mrow { align-items: flex-start; padding-top: 10px; padding-bottom: 10px; }
+.srow.mrow.pend { box-shadow: inset 3px 0 0 #c98a00; }
+.checks { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; }
+label.check { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 12px; color: var(--fg); font-size: 14px; cursor: pointer; }
+label.check + label.check { border-top: 1px solid var(--line); }
+label.check input { width: 16px; height: 16px; margin: 0; }

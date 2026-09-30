@@ -1,6 +1,6 @@
 // The modifier's Roles tab: every role at a glance (members, the targets it touches by name), and the same
 // permissions turned around, by member: "what can this address do?". Search appears once the list is long.
-import { h, put, short } from './ui.js';
+import { h, put, short, menu, toClipboard } from './ui.js';
 import { keyName } from './roles.js';
 import { named, namesFor } from './role-view.js';
 import * as labels from './labels.js';
@@ -34,16 +34,25 @@ export function rolesPage(ctx) {
       m && h('span.chip.draft', m === 'new' ? 'New' : 'Changed'),
       h('span.chip', ms.length + ' member' + (ms.length === 1 ? '' : 's')), h('span.chip', ts.length + ' target' + (ts.length === 1 ? '' : 's')));
   };
+  // A member: its roles (the default one marked), and in the editor its ⋯ (Edit roles…, Remove from all roles);
+  // one the draft removes stays, struck, with Restore.
+  const gone = ed && ctx.base ? [...new Set(Object.values(ctx.base.roles).flatMap(members))].filter((a) => !who[a]) : [];
   const memberRow = (a) => {
-    const rs = who[a].map((k, i) => [i ? ', ' : '', h('a', { href: '#/' + ctx.address + '/role/' + k }, keyName(k)), ctx.state.defaults[a] === k ? h('span.mut', ' (default)') : '']);
-    return h('div.srow.mrow', h('div.rmain', h('span', named(ctx.chain, a)), h('span.small', rs)), !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'));
+    const removed = !who[a], ks = removed ? Object.values(ctx.base.roles).filter((r) => r.members[a]).map((r) => r.key) : who[a];
+    const before = ctx.base && Object.values(ctx.base.roles).filter((r) => r.members[a]).map((r) => r.key);
+    const m = ed && (removed ? 'gone' : !before?.length ? 'new' : same(before, ks) && ctx.base.defaults[a] === ctx.state.defaults[a] ? null : 'changed');
+    const rs = ks.map((k) => h('a.rolechip' + (ctx.state.defaults[a] === k ? '.def' : ''), { href: '#/' + ctx.address + '/role/' + k, title: ctx.state.defaults[a] === k ? 'Default role: used when a call names no role' : null }, keyName(k), ctx.state.defaults[a] === k && h('span', 'default')));
+    return h('div.srow.mrow' + (m ? '.pend' : '') + (m === 'gone' ? '.gone' : ''), h('div.rmain', h('span', named(ctx.chain, a)), h('div.mroles', h('span.mut.small', ks.length === 1 ? 'Role' : 'Roles'), rs)),
+      !removed && !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'), m && h('span.chip.draft', { new: 'New', changed: 'Changed', gone: 'Removed in draft' }[m]),
+      ed && (removed ? h('button.link', { onclick: () => ed.restoreMember(a) }, 'Restore')
+        : menu(() => [['Edit roles…', () => ed.memberRoles(a)], ['Copy address', () => toClipboard(a).catch(() => {})], ['Remove from all roles', () => ed.removeEverywhere(a), true]], 'Member actions')));
   };
 
   const draw = () => {
     const q = search.value.trim();
     if (view === 'members') {
-      const list = Object.keys(who).filter((a) => !q || matches(a) || matches(labels.get(a) || '') || who[a].some((k) => matches(keyName(k))));
-      put(content, list.length ? h('div.slist', list.map(memberRow)) : h('p.empty', q ? 'No member matches.' : 'No members yet.'));
+      const list = [...Object.keys(who), ...gone].filter((a) => !q || matches(a) || matches(labels.get(a) || '') || (who[a] || []).some((k) => matches(keyName(k))));
+      put(content, list.length ? h('div.slist', list.map(memberRow)) : h('p.empty', q ? 'No member matches.' : 'No members yet.' + (ed ? ' Choose + Add member to start.' : '')));
     } else {
       const list = roles.filter((r) => !q || matches(keyName(r.key)) || members(r).some((a) => matches(a) || matches(labels.get(a) || '')) || targets(r).some((t) => matches(t.address) || matches(labels.get(t.address) || '')));
       put(content, list.length ? h('div.slist', list.map(roleRow)) : h('p.empty', q ? 'No role matches.' : ctx.complete ? 'No roles yet.' + (ed ? ' Choose + New role to start.' : '') : 'No roles found in this part of the history.'));
@@ -52,7 +61,7 @@ export function rolesPage(ctx) {
   const show = (which) => {
     view = which;
     put(tabs, [['roles', 'Roles · ' + roles.length], ['members', 'Members · ' + Object.keys(who).length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)), h('span.grow'),
-      ed && h('button.sm', { onclick: ed.newRole }, '+ New role'));
+      ed && (which === 'members' ? h('button.sm', { onclick: () => ed.memberRoles() }, '+ Add member') : h('button.sm', { onclick: ed.newRole }, '+ New role')));
     draw();
   };
   search.oninput = draw;
