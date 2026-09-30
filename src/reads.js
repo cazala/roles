@@ -106,6 +106,8 @@ export function reader(wallet, { chain, projectId }) {
       if (fallback.has(c) && HISTORY.includes(method)) return note(method, 'WalletConnect’s RPC'), jsonRpc(WC_RPC(c, projectId), method, params);
       try {
         const v = await wallet.request({ method, params });
+        // A wallet answering logs with no list (some do, for ranges too heavy for them) is treated as a refusal.
+        if (method === 'eth_getLogs' && !Array.isArray(v)) throw Error('history unavailable: the wallet answered eth_getLogs without a list');
         return note(method, null), v;
       } catch (e) {
         if (!HISTORY.includes(method) || !noHistory(e) || !projectId) throw e;
@@ -117,13 +119,13 @@ export function reader(wallet, { chain, projectId }) {
   const note = (method, s) => method === 'eth_getLogs' && (r.source = s);
   // Logs from Etherscan; each block with events must match the chain's own header.
   async function explorer(c, params) {
-    r.source = 'Etherscan (trusted to return every event)';
+    r.source = 'Etherscan';
     const logs = await explorerLogs(explorerKey(), c, params[0]);
     for (const b of [...new Set(logs.map((l) => l.blockNumber))]) {
       const header = await r.request({ method: 'eth_getBlockByNumber', params: [b, false] });
       if (!header || header.hash !== logs.find((l) => l.blockNumber === b).blockHash) throw Error('Etherscan returned a log in block ' + Number(b) + ' that does not match the chain. Remove the Etherscan key in Settings and try again.');
     }
-    r.source = 'Etherscan (trusted to return every event)';
+    r.source = 'Etherscan';
     return logs;
   }
   return r;

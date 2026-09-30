@@ -111,3 +111,29 @@ test('your RPC capping log ranges: those ranges go to WalletConnect’s RPC, eve
   assert.equal(await r.request({ method: 'eth_call', params: [{}] }), 'from https://capped.example/v2/key');
   globalThis.fetch = saved;
 });
+
+test('a request that never got through is tried again (twice), then reported plainly', async () => {
+  const saved = globalThis.fetch;
+  let n = 0;
+  globalThis.fetch = async () => { if (++n < 3) throw TypeError('Failed to fetch'); return { ok: true, json: async () => ({ jsonrpc: '2.0', id: 1, result: '0x1' }) }; };
+  const { jsonRpc } = await import('../../src/net.js');
+  assert.equal(await jsonRpc('https://x.example', 'eth_chainId'), '0x1');
+  assert.equal(n, 3);
+  globalThis.fetch = async () => { throw TypeError('Failed to fetch'); };
+  await assert.rejects(jsonRpc('https://x.example', 'eth_chainId'), /could not be reached \(Failed to fetch\)/);
+  globalThis.fetch = saved;
+});
+
+test('logs answered with no list: the wallet’s go to WalletConnect’s RPC; the scan narrows the range instead of failing', async () => {
+  reset();
+  const r = reader({ request: async () => null }, { chain: () => 1, projectId: 'p' });
+  assert.deepEqual(await r.request({ method: 'eth_getLogs', params: [{}] }), ['from ' + WC_RPC(1, 'p')]);
+  // An RPC that answers null for wide ranges and lists for small ones: the scan still completes.
+  const request = async (method, params) => {
+    if (method === 'eth_getCode') return Number(BigInt(params[1])) >= 10 ? '0x12' : '0x';
+    if (method === 'eth_getBlockByNumber') return { hash: 'h' + params[0] };
+    const p = params[0]; return Number(BigInt(p.toBlock)) - Number(BigInt(p.fromBlock)) + 1 > 5 ? null : [];
+  };
+  const res = await scan(request, { address, chain: 1, block: 40 });
+  assert.equal(res.complete, true);
+});

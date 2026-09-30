@@ -6,7 +6,17 @@ export const socket = (url) => new WebSocket(url);
 
 /** GET or POST JSON over HTTPS (the one fetch in the page). */
 async function json(url, body, what = 'The RPC') {
-  const res = await fetch(url, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+  // A request that never got through (network hiccup, a busy RPC closing the connection) is tried again twice.
+  let res;
+  for (let i = 0; ; i++) {
+    try {
+      res = await fetch(url, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+      break;
+    } catch (e) {
+      if (i >= 2) throw Error(what + ' could not be reached (' + e.message + ')');
+      await new Promise((ok) => setTimeout(ok, 800 * (i + 1)));
+    }
+  }
   if (res.ok) return res.json();
   // Many RPCs answer an HTTP error with a JSON-RPC error inside (e.g. a log range too wide): keep its message.
   const j = await res.json().catch(() => null);

@@ -8,6 +8,7 @@
   --badbg: #fde8ea;
   --warnbg: #fff4d6;
   --ok: #0a7d32;
+  --hint: #1f6feb;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -21,6 +22,7 @@
     --badbg: #3a1016;
     --warnbg: #3a2e0c;
     --ok: #4cd07d;
+    --hint: #58a6ff;
   }
 }
 body { overflow-wrap: anywhere; margin: 0 auto; max-width: 820px; padding: 12px 16px 0; font: 15px/1.45 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
@@ -513,3 +515,42 @@ p.wsec { margin: 18px 0 0; color: var(--mut); font-size: 13px; font-weight: 500;
 /* Settings: saved RPC endpoints, spaced from the field below; Remove inset from the edge. */
 .slist.rpcs { margin-bottom: 10px; }
 .slist.rpcs .srow { padding-right: 14px; }
+/* An inline suggestion in a muted line: bold, in color, clickable. */
+a.hint { color: var(--hint); font-weight: 700; text-decoration: none; }
+a.hint:hover { text-decoration: underline; }
+/* The history as a sync indicator: icon · status · one action · ⋯, a thin progress line while scanning. */
+.sync { position: relative; margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.sline { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; min-height: 44px; }
+.sicon { flex: none; display: inline-flex; width: 16px; justify-content: center; color: var(--mut); }
+.sicon svg { width: 16px; height: 16px; }
+.stext { flex: 1; min-width: 0; font-size: 14px; color: var(--fg); overflow-wrap: anywhere; }
+.sact button { padding: 4px 12px; font-size: 13px; }
+.smore { position: relative; }
+.smore .dropdown { right: 0; min-width: 280px; gap: 6px; padding: 12px; }
+.smore .dropdown label { margin: 0; color: var(--mut); font-size: 13px; }
+.smore .dropdown p { margin: 0; }
+.smore .dropdown .row input { min-width: 0; }
+/* In the ⋯ menu: Apply looks like a button; Clear is a menu item under a divider, with room for its hover. */
+.smore .dropdown .row button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
+.smore .dropdown .row button:hover { border-color: var(--mut); background: var(--card); }
+.smore .dropdown hr { width: 100%; margin: 6px 0 2px; border: 0; border-top: 1px solid var(--line); }
+.smore .dropdown button.sclear { margin: 0 -6px; padding: 8px 6px; border-radius: 6px; color: var(--fg); font-size: 13px; text-align: left; }
+.meter { display: none; height: 2px; margin: 0 12px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.meter span { display: block; height: 100%; width: 0; background: var(--fg); transition: width .4s ease; }
+.sync.metered .meter { display: block; }
+.shint { padding: 0 12px; font-size: 13px; color: var(--mut); }
+.shint:not(:empty) { padding: 6px 12px 10px; }
+.sync.metered .shint:empty { padding-bottom: 8px; }
+.spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--fg); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Once complete, it recedes: no card, muted, a check. */
+.sync.done, .sync.partial { border-color: transparent; background: none; }
+.sync.done .sline, .sync.partial .sline { padding-left: 0; min-height: 36px; }
+.sync.done .stext, .sync.partial .stext { color: var(--mut); font-size: 13px; }
+.sync.done .sicon { color: var(--ok); }
+.sync.error { border-color: #c98a00; background: var(--warnbg); }
+.sync.error .sicon { color: #c98a00; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } .meter span { transition: none; } }
+details.edetail { margin: 6px 0 0; border: 0; }
+details.edetail > summary { padding: 2px 0; font-size: 12px; color: var(--mut); }
+details.edetail pre { max-height: 180px; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }

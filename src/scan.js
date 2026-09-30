@@ -1,6 +1,8 @@
 import { load, store } from './store.js';
 import { quantity, decodeEvent, SETUP_TOPIC } from './roles.js';
 import { noHistory, tooWide } from './reads.js';
+// Some RPCs answer a range too heavy for them with no result (null) instead of an error: treat it as too wide.
+const list = (logs) => { if (!Array.isArray(logs)) throw Error('The RPC answered eth_getLogs without a list of logs (range too large?)'); return logs; };
 const cancelled = signal => { if (signal?.aborted) throw Error('Scan paused. Resume to continue.'); };
 // Most wallet RPCs are full nodes, not archives: past state (eth_getCode at an old block) is gone, logs are not.
 
@@ -19,7 +21,7 @@ export async function setupBlock(request, address, latest, signal) {
   while (to >= 0) {
     cancelled(signal); const from = Math.max(0, to - window + 1);
     let logs;
-    try { logs = await request('eth_getLogs', [{ address, topics: [SETUP_TOPIC], fromBlock: quantity(from), toBlock: quantity(to) }]); }
+    try { logs = list(await request('eth_getLogs', [{ address, topics: [SETUP_TOPIC], fromBlock: quantity(from), toBlock: quantity(to) }])); }
     // Some RPCs also refuse a range reaching far back as an "archive" request: narrow it the same way.
     catch (e) { if (window > 1 && (tooWide(e) || noHistory(e))) { window = Math.max(1, Math.floor(window / 2)); continue; } throw e; }
     if (logs.length) return Math.min(...logs.map(l => Number(BigInt(l.blockNumber))));
@@ -69,14 +71,14 @@ export async function scan(request, { address, chain, block, signal, progress = 
     cancelled(signal); const from = cache.last + 1, to = Math.min(block, from + window - 1);
     const before = await request('eth_getBlockByNumber', [quantity(to), false]);
     let logs;
-    try { logs = await request('eth_getLogs', [{ address, fromBlock: quantity(from), toBlock: quantity(to) }]); }
+    try { logs = list(await request('eth_getLogs', [{ address, fromBlock: quantity(from), toBlock: quantity(to) }])); }
     catch (e) { if (window > 1 && tooWide(e)) { window = Math.max(1, Math.floor(window / 2)); continue; } throw Error('Stopped at block ' + cache.last + ': ' + e.message); }
     cancelled(signal);
     for (const log of logs) { if (log.address.toLowerCase() !== address || Number(BigInt(log.blockNumber)) < from || Number(BigInt(log.blockNumber)) > to) throw Error('RPC returned a log outside the requested range'); decodeEvent(log); }
     const header = await request('eth_getBlockByNumber', [quantity(to), false]);
     if (!header || header.hash !== before?.hash) throw Error('Chain changed during scan. Reset and retry.');
     cache.logs.push(...logs); cache.last = to; cache.hash = header.hash;
-    store(key, cache); progress({ last: to, block, events: cache.logs.length }); windows++;
+    store(key, cache); progress({ start: cache.start, last: to, block, events: cache.logs.length }); windows++;
   }
   // A start typed by hand is still complete history when the scan contains the modifier's setup event.
   const setup = cache.logs.some(l => l.topics?.[0]?.toLowerCase() === SETUP_TOPIC);
