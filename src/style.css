@@ -676,3 +676,21 @@ button.sopt:hover, button.sopt.on { background: var(--bg); }
 .rvhead > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .rvhead > div > .mut { flex: none; width: 64px; font-size: 13px; }
 .rvhead .addr { min-width: 0; overflow-wrap: anywhere; }
+/* Review changes: numbered call cards (as the role viewer's target cards), parameters read by type. */
+.rvnote { margin: 0 0 10px; }
+.rvcalls { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 14px; }
+.rvcall { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; }
+.rvtop { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.rvtop b { flex: 1; min-width: 0; font-size: 14px; }
+.rvnum { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 50%; color: var(--mut); font-size: 12px; font-weight: 600; }
+table.rvargs { margin: 8px 14px; width: calc(100% - 28px); font-size: 13px; }
+table.rvargs th { padding-right: 14px; font-weight: 400; font-family: ui-monospace, monospace; font-size: 12px; }
+table.rvargs td code { font-size: 12px; }
+details.rvraw { margin: 0; padding: 0 14px; border: 0; border-top: 1px solid var(--line); }
+details.rvraw > summary { padding: 8px 0; font-size: 12px; color: var(--mut); }
+details.rvraw[open] { padding-bottom: 10px; }
+details.rvraw code.sig { display: block; margin-bottom: 6px; font-size: 12px; }
+details.rvraw pre, details.rvconds pre { margin: 0; max-height: 180px; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+details.rvconds { margin: 0; border: 0; }
+details.rvconds > summary { padding: 0; font-size: 13px; }
+.rvfoot { flex-wrap: wrap; }
