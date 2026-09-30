@@ -4,6 +4,7 @@ import { useRole } from './use.js';
 import { editConditions } from './condition-edit.js';
 import { conditionView } from './condition-view.js';
 import { allowancesView } from './allowances.js';
+import { rolesPage } from './roles-list.js';
 import { h, put, addr, bad, warn, act, short, icon } from './ui.js';
 import { session, route, settingsDialog } from './app.js';
 import { explorerKey } from './reads.js';
@@ -20,8 +21,7 @@ export function body(ctx, path) {
   if (hooks.body) { const custom = hooks.body(ctx, path); if (custom) return custom; }
   if (path[0] === 'role') return roleView(ctx, path[1]);
   if (path[0] === 'allowances') return hooks.allowances ? hooks.allowances(ctx) : h('div', h('h2', 'Allowances'), Object.keys(ctx.state.allowances).length ? h('pre', json(ctx.state.allowances)) : h('p.mut', 'No allowances in the scanned history.'));
-  const roles = Object.values(ctx.state.roles);
-  return h('div', h('h2', 'Roles'), roles.length ? h('div.slist', roles.map(r => h('a.srow', { href: '#/' + ctx.address + '/role/' + r.key }, h('b.name', keyName(r.key)), h('span.mut', Object.values(r.members).filter(Boolean).length + ' members · ' + Object.values(r.targets).filter(t => t.clearance).length + ' targets')))) : h('p.empty', ctx.complete ? 'No roles configured yet.' : 'No roles found in this part of the history.'));
+  return rolesPage(ctx);
 }
 export async function renderAddress(address, path, epoch) {
   const provider = session.provider, chain = session.chain;

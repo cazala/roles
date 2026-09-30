@@ -44,7 +44,7 @@ export async function namesFor(chain, address) {
 
 // An address with its contract name next to it, muted, when an Etherscan key is set and the contract is
 // verified there (wallets have none). The address stays: the name is a hint from Etherscan, not a claim we check.
-function named(chain, a) {
+export function named(chain, a) {
   const tag = h('span.mut.aname');
   if (explorerKey()) explorerSource(explorerKey(), chain, a).then((s) => s.name && put(tag, s.name), () => {});
   return [addr(a), tag];

@@ -30,7 +30,7 @@ export function uses(state) {
 
 // A token's decimals and symbol, read from the contract (null when it does not answer like a token).
 const tokens = new Map();
-function token(ctx, a) {
+export function token(ctx, a) {
   if (!tokens.has(a)) tokens.set(a, (async () => {
     const call = (data) => ctx.request('eth_call', [{ to: a, data }, 'latest']);
     const d = await call('0x313ce567').then((r) => (/^0x[0-9a-f]{64}$/i.test(r) ? Number(BigInt(r)) : null), () => null);

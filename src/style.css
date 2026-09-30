@@ -568,3 +568,11 @@ p.asum:empty { display: none; }
 .rhead .grow { flex: 1; }
 .afield .row select { flex: none; width: auto; }
 .afield .row input[aria-label="Every"] { flex: none; width: 90px; }
+/* Roles tab: a row per role (its targets by name, members and targets counted), or per member (its roles). */
+.rolespage input.search { width: 100%; margin: 4px 0 6px; }
+.rrow, .mrow { gap: 10px; }
+.rmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rmain .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mut); }
+.mrow .rmain .small a { color: var(--fg); }
+.srow.rrow.pend { box-shadow: inset 3px 0 0 #c98a00; }
+details.msettings { margin-top: 18px; }

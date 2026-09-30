@@ -12,6 +12,7 @@ import { parseValue } from './abicoder.js';
 import { proposal, gateway } from './handoff.js';
 import { load, store } from './store.js';
 import { allowancesView } from './allowances.js';
+import { rolesPage } from './roles-list.js';
 export const drafts = new Map();
 export const editorHooks = {};
 const id = ctx => ctx.chain + ':' + ctx.address;
@@ -239,7 +240,7 @@ export function editBody(ctx,path) {
       const key=path[1],member=d.value.roles[key]?.members[session.account]&&d.value.enabled[session.account];
       put(root,toolbar,roleView({...stateCtx,edit:edits(ctx,key),roleActions:member&&editorHooks.use&&h('button.primary.sm',{onclick:()=>editorHooks.use(ctx,key)},'Use this role')},key));
     } else if(path[0]==='allowances')put(root,toolbar,allowancesView({...stateCtx,edit:{set:(k,v)=>mutate(ctx,s=>{s.allowances[k]=v;})}}));
-    else {const roles=Object.values(d.value.roles);put(root,toolbar,h('h2','Roles'),roles.length?h('div.slist',roles.map(r=>h('a.srow',{href:'#/'+ctx.address+'/role/'+r.key},h('b',keyName(r.key)),h('span.mut',Object.values(r.members).filter(Boolean).length+' members · '+Object.values(r.targets).filter(t=>t.clearance).length+' targets')))):h('p.empty','No roles configured yet. Choose New role to start.'),h('div.actions',h('button',{onclick:()=>form('New role',[{key:'key',label:'Role name or bytes32 key'}],v=>{const key=roleKey(v.key);mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;})},'New role')),h('details',h('summary','Modifier settings'),h('div.actions',h('button',{onclick:()=>settings(ctx)},'Owner, avatar and target'),h('button',{onclick:()=>unwrapForm(ctx)},'Transaction unwrapper'))));}
+    else put(root,toolbar,rolesPage({...stateCtx,edit:{newRole:()=>form('New role',[{key:'key',label:'Role name or bytes32 key',info:'Members use a role by its key, a bytes32. A short name (up to 31 characters) becomes the key; you can also paste a 0x… key.'}],v=>{const key=roleKey(v.key);if(d.value.roles[key])throw Error('A role with this name exists.');mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;}),settings:()=>settings(ctx),unwrap:()=>unwrapForm(ctx)}}));
   };
   ctx.redraw(); return root;
 }
