@@ -24,3 +24,15 @@ test('indexed setup and lossless role names', () => {
   assert.equal(keyName(key), 'treasurer');
   assert.equal(keyName('0x' + 'ff'.repeat(32)), '0x' + 'ff'.repeat(32));
 });
+test('event signatures keep their onchain topics and indexed parameters', async () => {
+  const { default: events } = await import('../../src/events.js');
+  const { canonical } = await import('../../src/abicoder.js');
+  const { keccakText } = await import('../../src/abi.js');
+  const topic = (n) => { const e = events.find((x) => x.name === n); return keccakText(e.name + '(' + e.inputs.map(canonical).join(',') + ')'); };
+  assert.equal(events.length, 22);
+  assert.equal(topic('RolesModSetup'), '0x34d3b96a088381c6843a1f9d94d251afa88f83cc7a0d17fc23a7057506a3fc6d');
+  assert.equal(topic('ScopeFunction'), '0x4f6c340456f64db31a3d003c1224ba1de058557b1cdf71f21ae48ce4a4f64f52');
+  assert.equal(topic('AssignRoles'), '0x9f8368fa4ddcbd561efd7ad2a2174235bf5b840a73fb18f20db9705c11462498');
+  assert.equal(topic('SetAllowance'), '0x63d7ec44a20b176da1d60d75259d264ee67b3d8213706afa71a28f69ed8ebece');
+  assert.deepEqual(events.find((x) => x.name === 'RolesModSetup').inputs.map((p) => p.indexed), [true, true, true, false]);
+});
