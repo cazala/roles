@@ -216,7 +216,8 @@ function newModifier() {
   const { body, close } = sheet('plus', 'Create a Roles modifier'), out = h('div');
   const safe = h('input', { 'aria-label': 'Safe address', spellcheck: 'false', autocomplete: 'off' }), go = h('button.primary', 'Continue');
   go.onclick = act(go, async () => { const v = safe.value.trim().toLowerCase(); if (!isRef(v)) throw Error('Enter the Safe’s 0x address or name.'); close(); intent = true; location.hash = '/' + v + '?create'; }, out);
-  safe.onkeydown = (e) => e.key === 'Enter' && go.click();
+  // Enter continues, unless the suggestions used it to pick one (they handle it later in the same keypress).
+  safe.onkeydown = (e) => { if (e.key === 'Enter') setTimeout(() => e.defaultPrevented || go.click()); }; // never return false here: that cancels every keystroke
   const known = saved.filter((x, i) => saved.findIndex((y) => y.address === x.address) === i).map((x) => [x.address, labels.get(x.address) || network(x.chain)]);
   put(body, h('p.mut.small', 'A Roles modifier gives roles permissions over a Safe’s assets. Which Safe is it for?'), h('label', 'Safe'), suggestInput(safe, () => known), h('div.dfoot', h('span.grow'), h('button', { onclick: close }, 'Cancel'), go), out);
   safe.focus();
@@ -227,7 +228,7 @@ function home() {
   if (!saved.length) {
     const input = h('input.search', { id: 'open-address', placeholder: 'Address 0x… or name.eth / name.wei', 'aria-label': 'Open an address', autocomplete: 'off', spellcheck: 'false' }), out = h('div'), open = h('button.primary', 'Open');
     open.onclick = act(open, async () => openRef(input.value), out);
-    input.onkeydown = (e) => e.key === 'Enter' && (e.preventDefault(), open.click());
+    input.onkeydown = (e) => { if (e.key === 'Enter') e.preventDefault(), open.click(); }; // never return false here: that cancels every keystroke
     const n = Object.keys(labels.all()).length;
     return put(main, h('div.home', h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.', h('br'), 'No servers, everything stays in your browser.')),
       h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint.connecthint', 'You’ll connect your wallet to open it.'), out,
