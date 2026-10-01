@@ -75,7 +75,7 @@ export function allowancesView(ctx) {
     const card = h('section.tcard.acard' + (m ? '.pend' : ''), h('div.thead', h('div.tid', h('b.tname', keyName(key)), keyName(key) !== key ? null : h('span.mut.small', 'bytes32 key')),
       m && h('span.chip.draft', m === 'new' ? 'New' : 'Changed'), !a && h('span.chip.warn', 'Not set'),
       menu(() => [ed && [a ? 'Edit…' : 'Set…', () => allowanceDialog(ctx, key)], ['Copy key', () => toClipboard(key).catch(() => {})]], 'Allowance actions')), body,
-      list.length > 0 && h('div.tfoot', h('span.mut.small', 'Used by '), ...[...new Set(list.map((u) => u.role))].map((r, i) => [i ? ', ' : '', h('a', { href: '#/' + ctx.address + '/role/' + r }, keyName(r))]), h('span.mut.small', ' · ' + [...new Set(list.map((u) => ({ param: 'a parameter', eth: 'ETH sent', calls: 'calls' })[u.kind]))].join(', '))));
+      list.length > 0 && h('div.tfoot', h('span', h('span.mut.small', 'Used by '), ...[...new Set(list.map((u) => u.role))].map((r, i) => [i ? ', ' : '', h('a', { href: '#/' + ctx.address + '/role/' + r }, keyName(r))]), h('span.mut.small', ' · ' + [...new Set(list.map((u) => ({ param: 'a parameter', eth: 'ETH sent', calls: 'calls' })[u.kind]))].join(', ')))));
     root.append(card);
     if (!a) { put(body, warn('Conditions use this allowance, but it was never set, so they fail until it is.')); continue; }
     // A draft value is shown as drafted; otherwise the stored allowance, accrued to the displayed block.
