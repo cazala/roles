@@ -108,7 +108,7 @@ Same shell as safe.wei (header, breadcrumb, tabs; see DESIGN.md).
 
 ### Links
 
-Every screen has a link, and `#draft=` links propose permission changes (often written by an agent) that load into the editor for a person to review and send; nothing is applied by a link. See [docs/links.md](docs/links.md); `node scripts/draft-link.mjs plan.json --modifier 0x…` builds one.
+Every screen has a link, and `#draft=` links propose permission changes (often written by an agent) that load into the editor for a person to review and send; nothing is applied by a link. See [docs/links.md](docs/links.md); `node scripts/draft-link.mjs plan.json --modifier 0x…` builds one. Agents: [skills/roles-wei/SKILL.md](skills/roles-wei/SKILL.md).
 
 ## 4. Creating a modifier
 

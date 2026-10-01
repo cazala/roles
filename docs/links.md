@@ -1,6 +1,6 @@
 # Links
 
-roles.wei is a single page; everything after `#` is the route. Any gateway serving roles.wei accepts the same links (`https://roles.wei.limo/#/…`, `https://roles.wei.is/#/…`, `https://roles.caza.la/#/…`). Links only open screens or propose changes: nothing is applied or signed until a person reviews it and sends it.
+roles.wei is a single page; everything after `#` is the route. For agents, [skills/roles-wei/SKILL.md](../skills/roles-wei/SKILL.md) explains how to use these links. Any gateway serving roles.wei accepts the same links (`https://roles.wei.limo/#/…`, `https://roles.wei.is/#/…`, `https://roles.caza.la/#/…`). Links only open screens or propose changes: nothing is applied or signed until a person reviews it and sends it.
 
 ## Screens
 
