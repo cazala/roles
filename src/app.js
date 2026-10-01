@@ -229,7 +229,7 @@ function home() {
     open.onclick = act(open, async () => openRef(input.value), out);
     input.onkeydown = (e) => e.key === 'Enter' && (e.preventDefault(), open.click());
     const n = Object.keys(labels.all()).length;
-    return put(main, h('div.home', h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.')),
+    return put(main, h('div.home', h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.', h('br'), 'No servers, everything stays in your browser.')),
       h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint.connecthint', 'You’ll connect your wallet to open it. roles.wei reads the chain through your wallet.'), out,
         h('a.alt', { href: '#', onclick: (e) => (e.preventDefault(), newModifier()) }, h('span.mut', 'New to Roles?'), ' ', h('b', 'Create a modifier'), icon(...ICONS.next))),
       h('p.importhint', h('span.mut', 'Moving from another device? '), h('button.link', { onclick: () => backupDialog(null, reloadHome) }, 'Import a backup'), n > 0 && [h('span.mut', ' · '), h('button.link', { onclick: labelsSheet }, 'Labels (' + n + ')')], h('span.mut', ' · '), h('button.link', { onclick: settingsDialog }, 'Settings'))));
