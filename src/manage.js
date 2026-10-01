@@ -38,7 +38,7 @@ const words = (c) => [c.saved + ' address' + (c.saved === 1 ? '' : 'es'), c.labe
 
 /** Export as a link or JSON, or import one (roles.wei or safe.wei), with a preview before anything changes. */
 export function backupDialog(incoming, done) {
-  const { body: d, close, setTitle } = sheet('gear', 'Backup & sync', true);
+  const { body: d, close, setTitle } = sheet('sync', 'Backup & sync', true);
   const exportView = () => {
     const data = backup.collect(), out = h('div'), inErr = h('div');
     const btn = (text, fn, cls = '') => { const b = h('button' + cls, text); b.onclick = () => fn().then(() => (put(b, '✓ Copied'), setTimeout(() => put(b, text), 1500)), (e) => put(out, bad(e.message))); return b; };

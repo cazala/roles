@@ -153,7 +153,7 @@ function switchView(id, title, text, extra, auto = true) {
 
 /** Settings: RPC endpoints (reads go there instead of the wallet, per chain) and an Etherscan API key. */
 export function settingsDialog() {
-  const { body } = sheet('server', 'RPC & Etherscan');
+  const { body } = sheet('gear', 'Settings');
   const out = h('div'), list = h('div'), host = (u) => { try { return new URL(u).host; } catch { return u; } };
   const draw = () => {
     const m = Object.entries(rpcs());
@@ -193,9 +193,9 @@ function openRef(v) {
 function moreMenu() {
   const n = Object.keys(labels.all()).length, m = h('div.hmenu', { hidden: true });
   const item = (ic, text, fn) => h('button', { onclick: () => ((m.hidden = true), fn()) }, icon(...ICONS[ic]), text);
-  put(m, item('tag', n ? 'Labels (' + n + ')' : 'Labels', labelsSheet), item('gear', 'Backup & sync', () => backupDialog(null, reloadHome)), item('server', 'RPC & Etherscan', settingsDialog));
+  put(m, item('tag', n ? 'Labels (' + n + ')' : 'Labels', labelsSheet), item('sync', 'Backup & sync', () => backupDialog(null, reloadHome)), item('gear', 'Settings', settingsDialog));
   return h('div.split', h('button.splitmain', { onclick: newModifier, title: 'Create a Roles modifier for a Safe' }, icon(...ICONS.plus), h('span', 'New')),
-    h('button.splitcaret', { title: 'More: labels, backup & sync, RPC & Etherscan', 'aria-label': 'More', 'aria-haspopup': 'menu', onclick: () => (m.hidden = !m.hidden) }, icon(...CARET)), m);
+    h('button.splitcaret', { title: 'More: labels, backup & sync, settings', 'aria-label': 'More', 'aria-haspopup': 'menu', onclick: () => (m.hidden = !m.hidden) }, icon(...CARET)), m);
 }
 document.addEventListener('pointerdown', (e) => document.querySelectorAll('.hmenu').forEach((m) => !m.parentElement.contains(e.target) && (m.hidden = true)));
 /** A Roles modifier belongs to a Safe: pick it (your saved Safes and labels are suggested), then its page opens the wizard. */
@@ -218,7 +218,7 @@ function home() {
     const n = Object.keys(labels.all()).length;
     return put(main, h('div.home', h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.')),
       h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint', 'You’ll connect your wallet to open it.'), out),
-      h('p.importhint', h('span.mut', 'Moving from another device? '), h('button.link', { onclick: () => backupDialog(null, reloadHome) }, 'Import a backup'), n > 0 && [h('span.mut', ' · '), h('button.link', { onclick: labelsSheet }, 'Labels (' + n + ')')], h('span.mut', ' · '), h('button.link', { onclick: settingsDialog }, 'RPC & Etherscan'))));
+      h('p.importhint', h('span.mut', 'Moving from another device? '), h('button.link', { onclick: () => backupDialog(null, reloadHome) }, 'Import a backup'), n > 0 && [h('span.mut', ' · '), h('button.link', { onclick: labelsSheet }, 'Labels (' + n + ')')], h('span.mut', ' · '), h('button.link', { onclick: settingsDialog }, 'Settings'))));
   }
   const q = h('input.search', { id: 'open-address', placeholder: 'Search, or open 0x… / name.eth', 'aria-label': 'Search or open an address', autocomplete: 'off', spellcheck: 'false' });
   const rows = h('div'), out = h('div'), openRow = h('div');
