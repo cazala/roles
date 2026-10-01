@@ -1,4 +1,4 @@
-import { $, h, put, addr, bad, warn, act, sheet, copyButton, short, friendlyError, toClipboard, infoLabel } from './ui.js';
+import { $, h, put, addr, bad, warn, act, sheet, copyButton, short, friendlyError, toClipboard, infoLabel, suggestInput } from './ui.js';
 import * as labels from './labels.js';
 import { KNOWN_IDS, label } from './chains.js';
 import { parseAbi } from './abicoder.js';
@@ -24,29 +24,6 @@ export function draft(ctx) {
 const checkAddress = text => { if(!isAddr(text.trim()) || text.toLowerCase()===ZERO)throw Error('Enter a nonzero 0x address.');return text.trim().toLowerCase(); };
 const selector = text => /^0x[0-9a-fA-F]{8}$/.test(text)?text.toLowerCase():'0x'+signature(text).selector;
 export function mutate(ctx, fn) { const d=draft(ctx), next=structuredClone(d.value);fn(next);diff(d.base,next,ctx.address);d.history.push(d.value);d.value=next;ctx.redraw(); }
-/**
- * An address input that suggests your labelled addresses: all of them on focus (the list scrolls past a few),
- * filtered by label or address as you type; arrows and Enter pick one. `list()` gives [address, label] pairs.
- */
-function suggest(input,list) {
-  const box=h('div.suggest',{hidden:true,role:'listbox'});let rows=[],at=-1;
-  const pick=a=>{input.value=a;box.hidden=true;input.dispatchEvent(new Event('input'));};
-  const draw=()=>{
-    const q=input.value.trim().toLowerCase(),all=list();
-    const found=all.filter(([a,l])=>!q||l.toLowerCase().includes(q)||a.includes(q)).sort((x,y)=>x[1].localeCompare(y[1]));
-    rows=found.slice(0,100);at=-1;
-    put(box,rows.map(([a,l],i)=>h('button.sopt',{type:'button',role:'option',onpointerdown:e=>e.preventDefault(),onclick:()=>pick(a)},h('b',l),h('code',short(a)))),found.length>rows.length&&h('p.mut.small',(found.length-rows.length)+' more: type to filter'),!rows.length&&all.length>0&&q&&h('p.mut.small','No label matches. Paste the 0x address.'));
-    box.hidden=!rows.length||(isAddr(input.value.trim())&&rows.some(([a])=>a===input.value.trim().toLowerCase()));
-  };
-  const move=d=>{if(!rows.length)return;at=(at+d+rows.length)%rows.length;box.querySelectorAll('.sopt').forEach((b,i)=>b.classList.toggle('on',i===at));box.querySelectorAll('.sopt')[at].scrollIntoView({block:'nearest'});};
-  input.addEventListener('focus',draw);input.addEventListener('input',draw);
-  input.addEventListener('blur',()=>setTimeout(()=>box.hidden=true,100));
-  input.addEventListener('keydown',e=>{if(box.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();move(e.key==='ArrowDown'?1:-1);}else if(e.key==='Enter'&&at>=0){e.preventDefault();pick(rows[at][0]);}else if(e.key==='Escape'){e.stopPropagation();e.preventDefault();box.hidden=true;}});
-  const named=h('p.fhint.picked');
-  input.addEventListener('input',()=>put(named,labels.get(input.value.trim())&&['Your label: ',h('b',labels.get(input.value.trim()))]));
-  input.placeholder='0x… or search your labels';
-  return h('div.combo',input,box,named);
-}
 /** Your labelled addresses as [address, label], leaving out `skip` (addresses already there). */
 const labelled=skip=>Object.entries(labels.all()).filter(([a])=>isAddr(a)&&!skip.includes(a));
 export { OPTIONS_HINT };
@@ -56,7 +33,7 @@ export function form(title, fields, submit) {
     const input=f.options?h('select',{'aria-label':f.label},f.options.map(([value,text])=>h('option',{value},text))):h(f.multiline?'textarea':'input',{'aria-label':f.label,spellcheck:'false',autocomplete:'off'});
     if(f.value!=null)input.value=String(f.value);
     controls[f.key]=input;
-    body.append(f.info?infoLabel(f.label,f.info):h('label',f.label),f.suggest?suggest(input,f.suggest):input);
+    body.append(f.info?infoLabel(f.label,f.info):h('label',f.label),f.suggest?suggestInput(input,f.suggest):input);
     if (f.hint) body.append(h('p.fhint',f.hint));
   }
   const save=h('button.primary','Add to pending changes');save.onclick=act(save,async()=>{await submit(Object.fromEntries(Object.entries(controls).map(([k,v])=>[k,v.value])));close();},out);
@@ -102,7 +79,7 @@ function memberDialog(ctx,a) {
       if(def.value)s.defaults[m]=def.value;else if(s.defaults[m])s.defaults[m]='0x'+'0'.repeat(64);});
     close();
   },out);
-  put(body,!a&&[h('label','Member address'),suggest(who,()=>labelled(Object.keys(d.value.enabled).filter(x=>roles.some(r=>r.members[x]))))],
+  put(body,!a&&[h('label','Member address'),suggestInput(who,()=>labelled(Object.keys(d.value.enabled).filter(x=>roles.some(r=>r.members[x]))))],
     infoLabel('Roles','The roles this account or Safe may use. Each role’s page shows what it allows.'),roles.length?h('div.checks',boxes.map(b=>b.row)):h('p.mut.small','No roles yet: create one first.'),
     infoLabel('Default role','Calls that name no role (execTransactionFromModule) use the member’s default role. None: the member must name a role in each call.'),def,
     h('div.actions',h('button',{onclick:close},'Cancel'),h('span.grow'),save),out);

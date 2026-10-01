@@ -59,6 +59,7 @@ export const ICONS = {
   next: ['m9 6 6 6-6 6'],
   plus: ['M12 5v14', 'M5 12h14'],
   dots: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
+  sync: ['M21 12a9 9 0 0 1-15.5 6.2L3 16', 'M3 21v-5h5', 'M3 12a9 9 0 0 1 15.5-6.2L21 8', 'M21 3v5h-5'],
   tag: ['M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z', 'M7.5 7.5h.01'],
   gear: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z'],
 };
@@ -306,3 +307,27 @@ export function infoLabel(text, tip) {
   return h('label.infol', text, b, pop);
 }
 document.addEventListener('pointerdown', (e) => !e.target.closest('.infol') && document.querySelectorAll('.infotip').forEach((p) => (p.hidden = true)));
+
+/**
+ * An address input that suggests your labelled addresses: all of them on focus (the list scrolls past a few),
+ * filtered by label or address as you type; arrows and Enter pick one. `list()` gives [address, label] pairs.
+ */
+export function suggestInput(input,list) {
+  const box=h('div.suggest',{hidden:true,role:'listbox'});let rows=[],at=-1;
+  const pick=a=>{input.value=a;box.hidden=true;input.dispatchEvent(new Event('input'));};
+  const draw=()=>{
+    const q=input.value.trim().toLowerCase(),all=list();
+    const found=all.filter(([a,l])=>!q||l.toLowerCase().includes(q)||a.includes(q)).sort((x,y)=>x[1].localeCompare(y[1]));
+    rows=found.slice(0,100);at=-1;
+    put(box,rows.map(([a,l],i)=>h('button.sopt',{type:'button',role:'option',onpointerdown:e=>e.preventDefault(),onclick:()=>pick(a)},h('b',l),h('code',short(a)))),found.length>rows.length&&h('p.mut.small',(found.length-rows.length)+' more: type to filter'),!rows.length&&all.length>0&&q&&h('p.mut.small','No label matches. Paste the 0x address.'));
+    box.hidden=!rows.length||(/^0x[0-9a-fA-F]{40}$/.test(input.value.trim())&&rows.some(([a])=>a===input.value.trim().toLowerCase()));
+  };
+  const move=d=>{if(!rows.length)return;at=(at+d+rows.length)%rows.length;box.querySelectorAll('.sopt').forEach((b,i)=>b.classList.toggle('on',i===at));box.querySelectorAll('.sopt')[at].scrollIntoView({block:'nearest'});};
+  input.addEventListener('focus',draw);input.addEventListener('input',draw);
+  input.addEventListener('blur',()=>setTimeout(()=>box.hidden=true,100));
+  input.addEventListener('keydown',e=>{if(box.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();move(e.key==='ArrowDown'?1:-1);}else if(e.key==='Enter'&&at>=0){e.preventDefault();pick(rows[at][0]);}else if(e.key==='Escape'){e.stopPropagation();e.preventDefault();box.hidden=true;}});
+  const named=h('p.fhint.picked');
+  input.addEventListener('input',()=>put(named,labels.get(input.value.trim())&&['Your label: ',h('b',labels.get(input.value.trim()))]));
+  input.placeholder='0x… or search your labels';
+  return h('div.combo',input,box,named);
+}

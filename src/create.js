@@ -130,6 +130,8 @@ function wizard(ctx, resume) {
 }
 
 export function createView(ctx) {
+  // Home → + New: open the wizard right away (once: the flag leaves the URL).
+  if(ctx.start){history.replaceState(null,'',location.hash.replace(/[?&]create\b/,''));setTimeout(()=>wizard(ctx));}
   const pending=records().filter(x=>x.chain===ctx.chain&&x.safe===ctx.address&&!ctx.safe.modules.includes(x.address));
   return h('div',h('div.panel.create',h('div',h('b','Create a Roles modifier'),h('p.mut','Predict, deploy and enable Roles 2.1.1.')),h('button.primary',{onclick:()=>wizard(ctx)},'Create')),
     pending.map(x=>h('div.panel',h('b','Deployed, awaiting Safe enablement'),h('p',addr(x.address)),h('p.mut','Deployment '+x.tx),h('button',{onclick:()=>wizard(ctx,x)},'Prepare enablement'))));
