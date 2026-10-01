@@ -36,7 +36,7 @@ async function deploy() {
   try {
     for (const step of P.steps) {
       if ((await rpc('eth_getCode', [step.address, 'latest'])) !== '0x') continue;
-      const transaction = { from, to: P.deployer, data: P.salt + strip(step.initcode) };
+      const transaction = { from, to: P.deployer, data: step.salt + strip(step.initcode) };
       const estimate = BigInt(await rpc('eth_estimateGas', [transaction]));
       const gas = (estimate * 12n) / 10n < CAP ? (estimate * 12n) / 10n : CAP;
       log('Sending ' + step.name + ' (' + estimate + ' gas estimated)…');
@@ -53,7 +53,7 @@ async function verify() {
   const page = dbytes(await rpc('eth_call', [{ to: P.app, data: keccakText('html()').slice(0, 10) }, 'latest']));
   const ok = keccakHex(page) === P.contentHash && bytes(page).length === P.size;
   const tokenId = '0xc36e20c40544867956c355bcd6884c9f6ff3fe571a13891f39612f95318603f4';
-  const record = { chainId: chain, app: P.app, chunks: P.chunks, salt: P.salt, size: P.size, contentHash: P.contentHash, codeHash: keccakHex(await rpc('eth_getCode', [P.app, 'latest'])) };
+  const record = { chainId: chain, app: P.app, chunks: P.chunks, salt: P.salt, appSalt: P.appSalt, size: P.size, contentHash: P.contentHash, codeHash: keccakHex(await rpc('eth_getCode', [P.app, 'latest'])) };
   put($('result'), ok ? h('p.ok', '✓ html() matches the build: ' + P.size + ' bytes, contentHash ' + P.contentHash) : h('p.bad', '✗ html() does not match. Do not point roles.wei at it.'), ok && [h('h2', 'Next: point roles.wei'), h('p', 'From the roles.wei owner, send setAddr(uint256,address) to the WNS NameNFT:'), h('pre', 'to   0x0000000000696760E15f265e828DB644A0c242EB\ndata ' + cd(keccakText('setAddr(uint256,address)').slice(2, 10), tokenId, P.app)), h('p', 'Save this record as deploy/' + chain + '.json:'), h('pre', JSON.stringify(record, null, 2))]);
 }
 $('connect').onclick = () => connect().catch(error => log(h('b.bad', error.message || String(error))));

@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { build } from 'esbuild';
-import { compile, DEPLOYER, plan } from '../deploy-lib.mjs';
+import { compile, DEPLOYER, plan, VANITY } from '../deploy-lib.mjs';
 import { shim } from '../shim.mjs';
 
 const root = new URL('../..', import.meta.url).pathname;
@@ -15,10 +15,10 @@ const anvil = index > 0 ? process.argv[index + 1] : null;
 const port = Number(process.env.PORT || 8080);
 execFileSync(process.execPath, [root + 'scripts/build.mjs'], { stdio: 'inherit' });
 const html = readFileSync(root + 'dist/index.html', 'utf8');
-const deployment = plan(html, compile());
+const deployment = plan(html, compile(), undefined, { vanity: VANITY });
 const gas = deployment.steps.reduce((total, step) => total + 53000 + ((step.initcode.length - 2) / 2) * 216, 0);
 const js = (await build({ entryPoints: [root + 'scripts/deployer/client.js'], bundle: true, minify: true, format: 'iife', write: false })).outputFiles[0].text;
-const payload = { deployer: DEPLOYER, salt: deployment.salt, app: deployment.app, chunks: deployment.chunks, contentHash: deployment.contentHash, size: deployment.size, gas, steps: deployment.steps };
+const payload = { deployer: DEPLOYER, salt: deployment.salt, appSalt: deployment.appSalt, app: deployment.app, chunks: deployment.chunks, contentHash: deployment.contentHash, size: deployment.size, gas, steps: deployment.steps };
 const css = readFileSync(root + 'src/style.css', 'utf8');
 const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Deploy roles.wei</title><style>${css}</style></head><body>
 <header><b>Deploy roles.wei</b><span></span></header><main>
