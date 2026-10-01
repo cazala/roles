@@ -167,13 +167,13 @@ export function settingsDialog() {
   put(
     body,
     h('p.wsec', 'RPC endpoints'),
-    h('p.mut.small', 'roles.wei reads through your wallet. Add an RPC endpoint and every read on its chain goes there instead: faster, and it works where your wallet’s RPC dropped old history. The chain is detected from the endpoint. Signing always stays in your wallet.'),
+    h('p.mut.small', 'Reads on an endpoint’s chain go there instead of your wallet’s RPC. Your wallet still signs.'),
     list,
     h('div.row', url, add),
     h('p.wsec', 'Etherscan API key (optional, faster history)'),
-    h('p.mut.small', 'With a key, a Roles modifier’s history comes from Etherscan’s index in a few requests instead of block by block. roles.wei still checks every event and the block it is in, but trusts Etherscan to return all of them: a missing event would hide a permission. One key covers every chain Etherscan indexes. Leave it empty to read only from the chain.'),
+    h('p.mut.small', 'History loads from Etherscan in a few requests. Each event is checked against the chain, but Etherscan must return them all.'),
     h('div.row', key, saveKey),
-    h('p.mut.small', 'Kept in this browser (localStorage).'),
+    h('p.mut.small', 'Both are kept in this browser.'),
     out,
   );
 }
