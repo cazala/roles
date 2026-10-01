@@ -1,10 +1,10 @@
 # Implementation specification
 
-Status: phase 0. This is the contract and acceptance criteria for phases 1–8, not a claim that the application exists. Addresses, ABI and source revisions are pinned in [research.md](research.md) and `config/`.
+Status: implemented. This was the contract and acceptance criteria for phases 1–8, all merged; later features (the in-place editor, draft links, Settings, Backup & sync) are described in the [guide](guide.md) and [links.md](links.md). Addresses, ABI and source revisions are pinned in [research.md](research.md).
 
 ## Runtime and trust boundaries
 
-Ship one self-contained HTML file, vanilla JavaScript and CSS, no runtime packages or network resources. All chain reads use the selected EIP-1193 wallet. No public RPC URL, indexer, API, key or dev wallet goes in the production build. HTTP RPC access in the research/fork tooling is development-only. Reject remote resource references and raw output above 300,000 bytes; target below 100,000 bytes.
+Ship one self-contained HTML file, vanilla JavaScript and CSS, no runtime packages or network resources. Chain reads use the selected EIP-1193 wallet, with three exceptions, all only through `src/net.js`: WalletConnect's RPC (a phone wallet cannot serve reads, and history the wallet's RPC dropped), RPC endpoints the user adds in Settings, and Etherscan's API with the user's own key (history in a few requests; every event is still checked against the chain). No public RPC URL, indexer key or dev wallet goes in the production build. HTTP RPC access in the research/fork tooling is development-only. Reject remote resource references and raw output above 300,000 bytes; target below 100,000 bytes.
 
 Support reading identified contracts independently of creation dependencies. Creation requires the pinned 2.1.1 mastercopy and ModuleProxyFactory to have code on the current chain. Batching requires a MultiSendCallOnly address recognized by the pinned safe.wei. Recognize Roles 1.x and faulty 2.1.0 with clear version information; do not decode them as 2.1.1 or offer writes through the wrong ABI. Unknown implementations remain raw/read-only. A recognized address alone is not proof of arbitrary proxy compatibility: match the exact minimal-proxy runtime and implementation.
 
