@@ -37,7 +37,7 @@ export function form(title, fields, submit) {
     if (f.hint) body.append(h('p.fhint',f.hint));
   }
   const save=h('button.primary','Add to pending changes');save.onclick=act(save,async()=>{await submit(Object.fromEntries(Object.entries(controls).map(([k,v])=>[k,v.value])));close();},out);
-  body.append(out,h('div.actions',h('button',{onclick:close},'Cancel'),save));
+  body.append(out,h('div.dfoot',h('span.grow'),h('button',{onclick:close},'Cancel'),save));
   Object.values(controls)[0]?.focus();
 }
 const OPTIONS_HINT='CALL is a normal call. DELEGATECALL runs the target’s code as the Safe itself, so it can change anything in the Safe: allow it only for trusted batch contracts such as MultiSend. “With ETH” also lets the role send the Safe’s ETH.';
@@ -82,7 +82,7 @@ function memberDialog(ctx,a) {
   put(body,!a&&[h('label','Member address'),suggestInput(who,()=>labelled(Object.keys(d.value.enabled).filter(x=>roles.some(r=>r.members[x]))))],
     infoLabel('Roles','The roles this account or Safe may use. Each role’s page shows what it allows.'),roles.length?h('div.checks',boxes.map(b=>b.row)):h('p.mut.small','No roles yet: create one first.'),
     infoLabel('Default role','Calls that name no role (execTransactionFromModule) use the member’s default role. None: the member must name a role in each call.'),def,
-    h('div.actions',h('button',{onclick:close},'Cancel'),h('span.grow'),save),out);
+    h('div.dfoot',h('span.grow'),h('button',{onclick:close},'Cancel'),save),out);
   (a?boxes[0]?.c:who)?.focus();
 }
 function optionsForm(title,value,save){form(title,[{key:'options',label:'Execution options',value,options:opOptions,info:OPTIONS_HINT}],v=>save(Number(v.options)));}

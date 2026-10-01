@@ -14,8 +14,8 @@ export function labelsSheet() {
     const sort = h('select.lsort', { 'aria-label': 'Sort labels', onchange: () => (store('labelsort', (by = sort.value)), draw()) }, h('option', { value: 'date' }, 'Newest first'), h('option', { value: 'name' }, 'Name (A–Z)'));
     sort.value = by;
     put(el,
-      h('p.mut.small', 'Your names for addresses, shown instead of the address everywhere in roles.wei. Kept in this browser.'),
-      h('div.lhead', l.length > 1 && sort, h('span.grow'), h('button.sm', { onclick: () => labelDialog() }, '+ Add label')),
+      h('p.mut.small.lead', 'Your names for addresses, shown instead of the address everywhere in roles.wei. Kept in this browser.'),
+      h('div.lhead', l.length > 1 && sort, h('span.grow'), h('button', { onclick: () => labelDialog() }, icon(...ICONS.plus), ' Add label')),
       l.length ? h('div.slist.llist', l.map(([a, name]) => {
         const c = copy(a, 'Copy address');
         return h('div.srow.lrow', h('b.lname', { title: name }, name), h('code.sa', { title: a }, short(a)), c, h('span.grow'),
@@ -23,7 +23,7 @@ export function labelsSheet() {
           iconButton('close', 'Remove label', () => {
             const when = at[a];
             labels.set(a, '');
-            const undo = h('p.small', 'Removed ' + name + '. ', h('button.link', { onclick: () => labels.set(a, name, when) }, 'Undo'));
+            const undo = h('div.lrow.removed', h('span.mut', 'Removed ' + name + '.'), h('button.link', { onclick: () => labels.set(a, name, when) }, 'Undo'));
             setTimeout(() => undo.remove(), 6000);
             el.append(undo);
           }));
@@ -46,12 +46,12 @@ export function backupDialog(incoming, done) {
     const next = async () => { try { preview(await backup.parse(ta.value)); } catch (e) { put(inErr, bad(/JSON|Unexpected/.test(e.message) ? 'That does not look like a backup.' : e.message)); } };
     setTitle('Backup & sync');
     put(d,
-      h('p.mut.small', 'Move your saved addresses, labels and contract ABIs to another device. Nothing is uploaded: it all travels in the link or JSON. Your RPC endpoints and Etherscan key are not included.'),
+      h('p.mut.small.lead', 'Move your saved addresses, labels and contract ABIs to another device. Nothing is uploaded: it all travels in the link or JSON. Your RPC endpoints and Etherscan key are not included.'),
       h('div.bsec', h('b', 'Export'), h('div.mut.small', words(backup.counts(data)))),
       h('div.actions', btn('Copy link', async () => toClipboard(await backup.link(data)), '.primary'), btn('Copy JSON', async () => toClipboard(JSON.stringify(data, null, 2)))),
       h('p.mut.small', 'Open the link on your other device, or import the JSON there.'), out,
       h('div.bsec', h('b', 'Import'), h('div.mut.small', 'A roles.wei backup, or a safe.wei one (its Safes, labels and ABIs).')),
-      ta, h('div.actions', h('span.grow'), h('button.primary', { onclick: next }, 'Continue')), inErr);
+      ta, h('div.dfoot', h('span.grow'), h('button.primary', { onclick: next }, 'Continue')), inErr);
   };
   const preview = (data) => {
     const c = backup.counts(data), mine = labels.all(), ls = Object.entries(data.labels);
@@ -63,7 +63,7 @@ export function backupDialog(incoming, done) {
       ls.length > 0 && [warn('Labels are shown instead of addresses. Check each one before importing, especially if this backup came from someone else.'),
         h('ul.importlabels', ls.map(([a, l]) => h('li', h('b', l), ' ', h('code', a), mine[a] && mine[a] !== l && h('span.mut', ' (yours stays: ' + mine[a] + ')'))))],
       h('div.opts', opt('merge', 'Merge', 'Add what is missing. Nothing you already have is changed.'), opt('replace', 'Replace', 'Delete what is saved in this browser and use the backup instead.')),
-      h('div.actions', h('span.grow'), h('button', { onclick: () => (incoming ? close() : exportView()) }, incoming ? 'Cancel' : 'Back'),
+      h('div.dfoot', h('span.grow'), h('button', { onclick: () => (incoming ? close() : exportView()) }, incoming ? 'Cancel' : 'Back'),
         h('button.primary', { onclick: () => {
           if (mode === 'replace' && !confirm('Replace the saved addresses, labels and ABIs in this browser?')) return;
           backup.apply(data, mode);
