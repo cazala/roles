@@ -142,7 +142,7 @@ Copy safe.wei's structure and reuse its modules (they are small and dependency-f
 | `src/share.js`, `src/safe.js` | SafeTx hashing and `#tx=` links |
 | `src/multisend.js` | MultiSendCallOnly encoding |
 | `src/zodiac.js` | module identification |
-| `scripts/build.mjs`, `dev.mjs`, `shim.mjs`, `fork.mjs` | build (esbuild, single file, remote-resource checks, size report), dev server with an Anvil test wallet, fork harness |
+| `scripts/build.mjs`, `dev.mjs`, `shim.mjs`, `fork.mjs` | build (esbuild, single file, remote-resource checks, size report), dev server with an Anvil test wallet (or `--live`: a read-only wallet on the real chain, with Alchemy and Etherscan keys from `.env` kept server-side), fork harness |
 | `scripts/deploy*.mjs`, `scripts/deployer/`, `contract/SafeWeiApp.sol` | CREATE2 deployment of the page chunks and the ERC-8244 contract, LAN deployer page |
 
 Do not create a shared package yet; copy the files and note the safe.wei commit they came from in `docs/research.md`, so fixes can be ported both ways.
