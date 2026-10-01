@@ -234,12 +234,26 @@ export function editBody(ctx,path) {
   const link=new URLSearchParams(location.hash.split('?')[1]||'').get('draft');
   if(link&&d.link!==link){
     d.link=link;
-    decodeDraft(link).then(plan=>{const next=structuredClone(d.value),said=applyDraft(next,plan);diff(d.base,next,ctx.address);d.history.push(d.value);d.value=next;d.proposal={note:plan.note,said};ctx.redraw();},
-      e=>{d.proposal={error:e.message};ctx.redraw();});
+    decodeDraft(link).then(plan=>{
+      // With changes already pending, ask first: add the link's to them, or start fresh with only the link's.
+      const pending=diff(d.base,d.value,ctx.address).length;
+      if(pending){d.proposal={ask:pending,plan};return ctx.redraw();}
+      load(plan,d.value);
+    },e=>{d.proposal={error:e.message};ctx.redraw();});
+  }
+  // Load a plan on top of `from` (the pending draft, or the chain's state to start fresh); Undo brings back what was there.
+  function load(plan,from) {
+    try {const next=structuredClone(from),said=applyDraft(next,plan);diff(d.base,next,ctx.address);d.history.push(d.value);d.value=next;d.proposal={note:plan.note,said};}
+    catch(e){d.proposal={error:e.message};}
+    ctx.redraw();
   }
   const proposal=()=>{
     const p=d.proposal;if(!p)return null;
     const close=h('button.ib',{title:'Hide','aria-label':'Hide',onclick:()=>{d.proposal=null;ctx.redraw();}},'×');
+    if(p.ask)return h('div.proposal',h('div.phead',h('b','This link proposes changes, and you already have '+p.ask+' pending'),close),
+      p.plan.note&&h('p.small',h('span.mut','Note from the link (unverified): '),p.plan.note),
+      h('p.mut.small','Add the link’s changes to yours, or start fresh with only the link’s (yours come back with Undo).'),
+      h('div.actions',h('button.sm',{onclick:()=>load(p.plan,d.value)},'Add to them'),h('button.sm',{onclick:()=>load(p.plan,d.base)},'Start fresh with only this link')));
     if(p.error)return h('div.proposal.bad',h('div.phead',h('b','This link’s changes could not be loaded'),close),h('p.small',p.error+' Nothing was changed.'));
     // Everything it asks for may already be onchain (each change states an end result): then there is nothing to send.
     if(!diff(d.base,d.value,ctx.address).length)return h('div.proposal',h('div.phead',h('b','This link’s changes are already in place'),close),p.note&&h('p.small',h('span.mut','Note from the link (unverified): '),p.note),h('p.mut.small','Everything it asks for matches the chain: there is nothing to send.'),h('details',h('summary','What the link asks for'),h('ol.small',p.said.map(x=>h('li',x)))));

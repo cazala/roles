@@ -32,7 +32,7 @@ A set of permission changes, often written by an agent, that a person reviews be
 ```
 
 - `z`: the JSON deflated (raw DEFLATE, `CompressionStream('deflate-raw')`), then base64url without padding. `j`: the JSON itself, base64url. Readers accept both; writers should prefer `z`.
-- Opening it on a complete history loads every change into the editor's draft, all or nothing: they show as pending changes, marked New or Changed where they are, with a banner saying the link proposes them, its `note` (shown as unverified) and the list in words. Review changes then shows the exact calls, and Apply (the owner's wallet) or Prepare safe.wei link (a Safe owner) sends them. A malformed draft loads nothing and says why.
+- Opening it on a complete history loads every change into the editor's draft, all or nothing: they show as pending changes, marked New or Changed where they are, with a banner saying the link proposes them, its `note` (shown as unverified) and the list in words. Review changes then shows the exact calls, and Apply (the owner's wallet) or Prepare safe.wei link (a Safe owner) sends them. A malformed draft loads nothing and says why. If changes are already pending (your edits, or an earlier link in the same tab), it asks first: **Add to them**, or **Start fresh with only this link** (Undo brings yours back).
 - Each change states the end result ("this function has these conditions"), not a step: a change that already matches the chain drops out of the review, and loading a link twice is the same as once.
 
 ### JSON
