@@ -34,6 +34,10 @@ An interface for [Zodiac Roles](https://github.com/gnosisguild/zodiac-modifier-r
 
 ## Agents
 
+[![skills.sh](https://skills.sh/b/cazala/roles)](https://skills.sh/cazala/roles)
+
+Install the skill for your agent (Claude Code, Codex, Cursor and others) with the [skills](https://skills.sh) CLI: `npx skills add cazala/roles`, and its sibling with `npx skills add cazala/safe`.
+
 roles.wei has no API: an agent proposes permission changes in a link; a person opens it, sees every change marked in the editor, reviews the calls, and the modifier's owner applies them (usually the Safe, through safe.wei). The link never applies or signs anything.
 
 - **Skill**: [skills/roles-wei/SKILL.md](skills/roles-wei/SKILL.md) tells an agent how to write a draft (members, targets, functions with conditions, allowances), the least-privilege rules to follow, and what to tell the person.

@@ -64,3 +64,5 @@ It refuses a malformed plan (naming the change at fault), builds every change as
 2. Use verified full 0x addresses and correct token decimals; never guess.
 3. Tell the person roles.wei shows the changes marked in place under "This link proposes N changes", with your note marked unverified, and that they should check each one, then Review changes, which lists the exact calls.
 4. Applying is the modifier owner's step: Apply (owner's wallet) or Prepare safe.wei link (owner Safe), then the Safe's owners sign in safe.wei.
+
+The sibling skill `safe-wei` (`npx skills add cazala/safe`) covers Safe transactions in safe.wei.
