@@ -297,7 +297,7 @@ export async function route() {
 }
 addEventListener('hashchange', route);
 discover(() => { header(); });
-const foot = () => put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__), h('span.mut', ' · ', h('a', { href: savedGateway(), target: '_blank', rel: 'noopener', title: 'Your Safe, served onchain' }, 'safe.wei')), LINK.source && h('span.mut', ' · ', h('a', { href: LINK.source, target: '_blank', rel: 'noopener' }, 'Source')));
+const foot = () => put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__), h('span.mut', ' · ', h('a', { href: savedGateway(), target: '_blank', rel: 'noopener', title: 'Your Safe, served onchain' }, 'safe.wei')), LINK.source && h('span.mut', ' · ', h('a', { href: LINK.source, target: '_blank', rel: 'noopener' }, 'source')));
 foot();
 header(); route();
 if (remembered() === 'walletconnect') ownerConn.restore().catch(() => {});
