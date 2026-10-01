@@ -106,6 +106,10 @@ Same shell as safe.wei (header, breadcrumb, tabs; see DESIGN.md).
    - owner is the connected wallet → send the transactions directly.
 7. **Use a role** (for members): pick role, target, function (from an ABI you paste, as in safe.wei's Custom tab), fill parameters, see whether the current conditions allow it (simulate `execTransactionWithRole` with `eth_call` from the member), then send.
 
+### Links
+
+Every screen has a link, and `#draft=` links propose permission changes (often written by an agent) that load into the editor for a person to review and send; nothing is applied by a link. See [docs/links.md](docs/links.md); `node scripts/draft-link.mjs plan.json --modifier 0x…` builds one.
+
 ## 4. Creating a modifier
 
 - Form: owner (defaults to the Safe; warn when changed), avatar and target (default to the Safe), salt (random, editable, under Advanced).

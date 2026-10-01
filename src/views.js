@@ -19,9 +19,11 @@ const options = n => ['CALL, no ETH', 'CALL with ETH', 'CALL or DELEGATECALL, no
 export { roleView } from './role-view.js';
 export function body(ctx, path) {
   if (hooks.body) { const custom = hooks.body(ctx, path); if (custom) return custom; }
-  if (path[0] === 'role') return roleView(ctx, path[1]);
+  // A #draft= link needs the complete history (it loads into the editor), which a read-only page does not have.
+  const proposed = /[?&]draft=/.test(location.hash) && warn('This link proposes permission changes, but they load only on a complete history (this one starts at a block you chose, or the version is not editable). Nothing was changed.');
+  if (path[0] === 'role') return h('div', proposed, roleView(ctx, path[1]));
   if (path[0] === 'allowances') return hooks.allowances ? hooks.allowances(ctx) : h('div', h('h2', 'Allowances'), Object.keys(ctx.state.allowances).length ? h('pre', json(ctx.state.allowances)) : h('p.mut', 'No allowances in the scanned history.'));
-  return rolesPage(ctx);
+  return h('div', proposed, rolesPage(ctx));
 }
 // A Roles modifier read in this session, by chain, address and account: moving between its pages (roles, a
 // role, allowances) renders from memory. Refresh, Apply, a Settings change or another wallet, account or chain

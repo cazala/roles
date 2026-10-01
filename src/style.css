@@ -652,3 +652,12 @@ p.lead { margin: 4px 0 8px; }
 .panel a.alt:hover { background: var(--bg); }
 .panel a.alt svg { width: 14px; height: 14px; margin-left: auto; color: var(--mut); }
 .panel p.alt { margin-bottom: -16px; }
+/* A #draft= link: what it proposes, above the editor. */
+.proposal { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.proposal.bad { border-color: var(--bad); }
+.phead { display: flex; align-items: center; gap: 8px; }
+.phead b { flex: 1; }
+.proposal p { margin: 6px 0 0; }
+.proposal details { margin: 8px 0 0; border: 0; }
+.proposal details > summary { font-size: 13px; color: var(--mut); }
+.proposal ol { margin: 6px 0 0; padding-left: 20px; overflow-wrap: anywhere; }
