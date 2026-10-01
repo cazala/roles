@@ -12,6 +12,7 @@ import { parseValue } from './abicoder.js';
 import { proposal, gateway } from './handoff.js';
 import { load, store } from './store.js';
 import { allowancesView } from './allowances.js';
+import { rolesPage } from './roles-list.js';
 export const drafts = new Map();
 export const editorHooks = {};
 const id = ctx => ctx.chain + ':' + ctx.address;
@@ -84,6 +85,28 @@ function addFunction(ctx,key,t,names) {
     h('label','Or type a signature or selector'),h('div.row',sig,byHand),out);
   if(names?.abi.length)draw();
   (fns.length>6?search:sig).focus();
+}
+/** A member's roles, all at once: which roles it is in, and its default role (used when a call names none). */
+function memberDialog(ctx,a) {
+  const d=draft(ctx),roles=Object.values(d.value.roles),{body,close}=sheet('people',a?'Roles of '+short(a):'Add member',true),out=h('div');
+  const who=h('input',{'aria-label':'Member address',spellcheck:'false',autocomplete:'off'});
+  const boxes=roles.map(r=>{const c=h('input',{type:'checkbox',checked:!!(a&&r.members[a])});c.onchange=drawDef;return {key:r.key,c,row:h('label.check',c,h('span',keyName(r.key)))};});
+  const def=h('select',{'aria-label':'Default role'});
+  function drawDef(){const cur=def.value||(a&&d.value.defaults[a])||'';put(def,h('option',{value:''},'None'),boxes.filter(b=>b.c.checked).map(b=>h('option',{value:b.key},keyName(b.key))));def.value=boxes.some(b=>b.c.checked&&b.key===cur)?cur:'';}
+  drawDef();
+  const save=h('button.primary','Add to pending changes');
+  save.onclick=act(save,async()=>{
+    const m=a||checkAddress(who.value),on=boxes.filter(b=>b.c.checked);
+    if(!on.length)throw Error(a?'Choose at least one role, or use Remove from all roles.':'Choose at least one role.');
+    mutate(ctx,s=>{for(const b of boxes)if(b.c.checked||s.roles[b.key].members[m])s.roles[b.key].members[m]=b.c.checked;s.enabled[m]=true;
+      if(def.value)s.defaults[m]=def.value;else if(s.defaults[m])s.defaults[m]='0x'+'0'.repeat(64);});
+    close();
+  },out);
+  put(body,!a&&[h('label','Member address'),suggest(who,()=>labelled(Object.keys(d.value.enabled).filter(x=>roles.some(r=>r.members[x]))))],
+    infoLabel('Roles','The roles this account or Safe may use. Each role’s page shows what it allows.'),roles.length?h('div.checks',boxes.map(b=>b.row)):h('p.mut.small','No roles yet: create one first.'),
+    infoLabel('Default role','Calls that name no role (execTransactionFromModule) use the member’s default role. None: the member must name a role in each call.'),def,
+    h('div.actions',h('button',{onclick:close},'Cancel'),h('span.grow'),save),out);
+  (a?boxes[0]?.c:who)?.focus();
 }
 function optionsForm(title,value,save){form(title,[{key:'options',label:'Execution options',value,options:opOptions,info:OPTIONS_HINT}],v=>save(Number(v.options)));}
 /** The actions on a role page's cards, functions and members; role-view.js calls them from the ⋯ menus. */
@@ -239,7 +262,7 @@ export function editBody(ctx,path) {
       const key=path[1],member=d.value.roles[key]?.members[session.account]&&d.value.enabled[session.account];
       put(root,toolbar,roleView({...stateCtx,edit:edits(ctx,key),roleActions:member&&editorHooks.use&&h('button.primary.sm',{onclick:()=>editorHooks.use(ctx,key)},'Use this role')},key));
     } else if(path[0]==='allowances')put(root,toolbar,allowancesView({...stateCtx,edit:{set:(k,v)=>mutate(ctx,s=>{s.allowances[k]=v;})}}));
-    else {const roles=Object.values(d.value.roles);put(root,toolbar,h('h2','Roles'),roles.length?h('div.slist',roles.map(r=>h('a.srow',{href:'#/'+ctx.address+'/role/'+r.key},h('b',keyName(r.key)),h('span.mut',Object.values(r.members).filter(Boolean).length+' members · '+Object.values(r.targets).filter(t=>t.clearance).length+' targets')))):h('p.empty','No roles configured yet. Choose New role to start.'),h('div.actions',h('button',{onclick:()=>form('New role',[{key:'key',label:'Role name or bytes32 key'}],v=>{const key=roleKey(v.key);mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;})},'New role')),h('details',h('summary','Modifier settings'),h('div.actions',h('button',{onclick:()=>settings(ctx)},'Owner, avatar and target'),h('button',{onclick:()=>unwrapForm(ctx)},'Transaction unwrapper'))));}
+    else put(root,toolbar,rolesPage({...stateCtx,edit:{memberRoles:a=>memberDialog(ctx,a),removeEverywhere:a=>mutate(ctx,s=>{for(const r of Object.values(s.roles))if(r.members[a])r.members[a]=false;if(d.base.defaults[a])s.defaults[a]='0x'+'0'.repeat(64);else delete s.defaults[a];}),restoreMember:a=>mutate(ctx,s=>{for(const r of Object.values(s.roles))if(r.members[a]!==undefined)r.members[a]=!!d.base.roles[r.key]?.members[a];if(d.base.defaults[a])s.defaults[a]=d.base.defaults[a];else delete s.defaults[a];}),newRole:()=>form('New role',[{key:'key',label:'Role name or bytes32 key',info:'Members use a role by its key, a bytes32. A short name (up to 31 characters) becomes the key; you can also paste a 0x… key.'}],v=>{const key=roleKey(v.key);if(d.value.roles[key])throw Error('A role with this name exists.');mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;}),settings:()=>settings(ctx),unwrap:()=>unwrapForm(ctx)}}));
   };
   ctx.redraw(); return root;
 }

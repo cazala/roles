@@ -237,7 +237,10 @@ p.gateback a:hover { color: var(--fg); }
 .split svg { width: 16px; height: 16px; }
 .returning .saved { margin-top: 14px; }
 /* The list: one card, a row per Safe or folder; folders open in place. */
-.slist { border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; }
+.slist { border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+/* Not overflow: hidden (it would clip a row's ⋯ menu): the first and last rows round their own corners. */
+.slist > :first-child { border-top-left-radius: 11px; border-top-right-radius: 11px; }
+.slist > :last-child { border-bottom-left-radius: 11px; border-bottom-right-radius: 11px; }
 .srow { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 8px 4px calc(14px + var(--d, 0) * 22px); color: var(--fg); text-decoration: none; font-size: 14px; }
 .slist .srow + .srow, .kids > :first-child { border-top: 1px solid var(--line); }
 .srow:not(.removed):hover { background: var(--bg); }
@@ -568,3 +571,23 @@ p.asum:empty { display: none; }
 .rhead .grow { flex: 1; }
 .afield .row select { flex: none; width: auto; }
 .afield .row input[aria-label="Every"] { flex: none; width: 90px; }
+/* Roles tab: a row per role (its targets by name, members and targets counted), or per member (its roles). */
+.rolespage input.search { width: 100%; margin: 4px 0 6px; }
+.rrow, .mrow { gap: 10px; }
+.rmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rmain .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mut); }
+.mrow .rmain .small a { color: var(--fg); }
+.srow.rrow.pend { box-shadow: inset 3px 0 0 #c98a00; }
+details.msettings { margin-top: 18px; }
+/* Members view: each member's roles as chips (the default one marked); the roles dialog's checkboxes. */
+.mroles { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+a.rolechip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--fg); font-size: 12px; text-decoration: none; }
+a.rolechip:hover { border-color: var(--mut); }
+a.rolechip.def { border-color: var(--fg); }
+a.rolechip span { color: var(--mut); font-size: 11px; }
+.srow.mrow { align-items: flex-start; padding-top: 10px; padding-bottom: 10px; }
+.srow.mrow.pend { box-shadow: inset 3px 0 0 #c98a00; }
+.checks { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; }
+label.check { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 12px; color: var(--fg); font-size: 14px; cursor: pointer; }
+label.check + label.check { border-top: 1px solid var(--line); }
+label.check input { width: 16px; height: 16px; margin: 0; }
