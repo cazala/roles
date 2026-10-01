@@ -62,8 +62,8 @@ Never put a private key or Cloudflare token in shell history, the repository or 
 
 ## Latest clean rehearsal
 
-Phase 8 was rehearsed on a fresh pinned mainnet fork on 2026-09-28. The 111,627-byte page deployed in five chunks plus the app contract, used 25,177,704 gas, and `html()` matched `dist/index.html` byte for byte.
+Rehearsed on a fresh mainnet fork (latest block) on 2026-10-01: the 208,660-byte page deployed in the config chunk plus 9 chunks and the app contract, at the mined vanity address, using **46,700,821 gas**, and `html()` matched `dist/index.html` byte for byte. At 0.4 gwei that is ~0.019 ETH, at 1.2 gwei ~0.056 ETH; fees are usually lowest on weekends.
 
-- App: `0x87150d22a9500ad12cd2c52d18cea24937d3d730`
-- Content hash: `0x84ed550e83f15a5dfb9deda395952c50f270c54cec7436b07bb4711f6112fecf`
-- Runtime code hash: `0x0be3051eca1c6af87a2ad2574b010806b0f3d1295cbe9141c9c8242c75de9f55`
+- App: `0x00000179dddf4e99bfa509d50eee6d321024f788` (app salt `0x…09f847`; it changes with every rebuild)
+- Content hash: `0x8d8afe431bf74658dfa316c9611f02e5f5ebc54d0d28ebfd560f036c1d1ebc38`
+- Runtime code hash: `0x8502ba71d3ffcb9b4f070222aad3ed1042897376e2ea18c4c2ccd697bfd07b99`
