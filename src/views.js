@@ -45,7 +45,7 @@ export async function renderAddress(address, path, epoch) {
       const meta = item.version ? await metadata(request, m, snapshot.number) : null;
       return h('div', h('div.srow', item.version ? h('a.name', { href: '#/' + m }, 'Roles ' + item.version) : h('b', 'Other module'), addr(m)), item.faulty && warn('This Roles version is faulty. Do not grant new permissions.'), meta && h('div.modulemeta', h('p', 'Owner ', addr(meta.owner)), meta.owner !== address && warn('This owner can change every permission and control the Safe’s assets.'), (meta.avatar !== address || meta.target !== address) && warn('Avatar or target differs from this Safe.'), h('p', 'Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target))));
     }));
-    return h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), hooks.create && hooks.create({ address, safe, request, snapshot, chain }), modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'));
+    return h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), hooks.create && hooks.create({ address, safe, request, snapshot, chain, start: /[?&]create\b/.test(location.hash) }), modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'));
   }
   const meta = hit ? hit.meta : await metadata(request, address, snapshot.number);
   let ownerSafe = hit ? hit.ownerSafe : false;

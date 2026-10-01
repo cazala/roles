@@ -589,3 +589,56 @@ a.rolechip span { color: var(--mut); font-size: 11px; }
 label.check { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 12px; color: var(--fg); font-size: 14px; cursor: pointer; }
 label.check + label.check { border-top: 1px solid var(--line); }
 label.check input { width: 16px; height: 16px; margin: 0; }
+
+/* Home (from safe.wei): one field that searches or opens, + New ▾, and the Labels and Backup & sync sheets. */
+input.rename { padding: 4px 8px; font: inherit; font-size: 15px; font-weight: 600; }
+.lhead { display: flex; align-items: center; gap: 8px; margin: 10px 0 8px; }
+.lhead button { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; }
+select.lsort { width: auto; padding: 7px 32px 7px 10px; border-radius: 8px; font-family: inherit; font-size: 13px; background-color: var(--card); }
+.lhead .grow, .lrow .grow { flex: 1; }
+.llist { border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; }
+.lrow { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 2px 6px 2px 14px; font-size: 14px; }
+.llist .lrow + .lrow { border-top: 1px solid var(--line); }
+.lrow b.lname { min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow code { color: var(--mut); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.lrow code:hover { color: var(--fg); }
+.lrow button.copy { margin-left: -6px; }
+.lrow.removed { margin-top: 8px; border: 1px dashed var(--line); border-radius: 12px; }
+.bsec { margin: 16px 0 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.bsec:first-of-type { border-top: 0; padding-top: 0; }
+.opts { display: grid; gap: 8px; margin: 12px 0; }
+label.opt { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--fg); cursor: pointer; }
+label.opt input { width: auto; margin-top: 3px; }
+label.opt span { display: flex; flex-direction: column; gap: 2px; }
+ul.importlabels { max-height: 30vh; overflow: auto; margin: 6px 0; padding-left: 18px; font-size: 13px; }
+ul.importlabels code { font-size: 11px; overflow-wrap: anywhere; }
+p.importhint { margin: 20px 0 0; text-align: center; font-size: 13px; }
+p.importhint button.link { font-size: 13px; color: var(--fg); }
+.hbar { display: flex; align-items: center; gap: 8px; }
+label.sfield { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; margin: 0; }
+label.sfield svg { position: absolute; left: 12px; width: 16px; height: 16px; color: var(--mut); pointer-events: none; }
+label.sfield input { padding: 10px 12px 10px 36px; border-radius: 10px; background: var(--card); font-family: inherit; font-size: 14px; }
+/* "+ New | ▾" split button */
+.split { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.split > .splitmain, .split > button.splitcaret { display: inline-flex; align-items: center; border: 0; background: none; color: var(--fg); font-size: 14px; text-decoration: none; white-space: nowrap; }
+.split > .splitmain { gap: 4px; padding: 9px 12px 9px 10px; border-radius: 9px 0 0 9px; }
+.split > button.splitcaret { padding: 0 9px; border-radius: 0 9px 9px 0; color: var(--mut); }
+.split > .splitmain + button.splitcaret { border-left: 1px solid var(--line); }
+.split > .splitmain:hover, .split > button.splitcaret:hover { background: var(--bg); color: var(--fg); }
+.split svg { width: 16px; height: 16px; }
+.hmenu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 180px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.hmenu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--fg); font-size: 14px; text-align: left; }
+.hmenu button:hover { background: var(--bg); }
+.hmenu svg { width: 16px; height: 16px; color: var(--mut); }
+p.hnote { margin: 10px 2px 0; color: var(--mut); font-size: 13px; }
+.returning .openlist { margin-top: 14px; }
+.openlist + .saved { margin-top: 8px; }
+a.srow.other { opacity: .6; }
+.srow .acts { display: flex; gap: 2px; opacity: 0; }
+.srow:hover .acts, .srow:focus-within .acts { opacity: 1; }
+@media (hover: none) { .srow .acts { opacity: 1; } }
+.openlist .srow { gap: 6px; }
+@media (max-width: 600px) { .split > .splitmain span { display: none; } .split > .splitmain { padding: 9px 10px; } }
+.split { position: relative; }
+.returning > div > .slist { margin-top: 14px; }
+.lrow { min-height: 40px; }

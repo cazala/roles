@@ -1,5 +1,5 @@
 import { renderAddress, forget } from './views.js';
-import { $, h, put, addr, short, icon, ICONS, sheet, bad, act, setResolver, friendlyError, copyButton, NS } from './ui.js';
+import { $, h, put, addr, short, icon, ICONS, sheet, bad, act, setResolver, friendlyError, copyButton, NS, iconButton, suggestInput } from './ui.js';
 import { isAddr } from './abi.js';
 import { use, rpc } from './rpc.js';
 import { add, discover, list, remembered, remember } from './wallets.js';
@@ -8,6 +8,7 @@ import { qr, qrPath } from './qr.js';
 import { addRpc, explorerKey, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } from './reads.js';
 import { nameOf, resolveName } from './names.js';
 import { load, store } from './store.js';
+import { labelsSheet, backupDialog } from './manage.js';
 import * as labels from './labels.js';
 
 export const session = { provider: null, account: null, chain: null, epoch: 0 };
@@ -152,7 +153,7 @@ function switchView(id, title, text, extra, auto = true) {
 
 /** Settings: RPC endpoints (reads go there instead of the wallet, per chain) and an Etherscan API key. */
 export function settingsDialog() {
-  const { body } = sheet('gear', 'Settings');
+  const { body } = sheet('server', 'RPC & Etherscan');
   const out = h('div'), list = h('div'), host = (u) => { try { return new URL(u).host; } catch { return u; } };
   const draw = () => {
     const m = Object.entries(rpcs());
@@ -176,37 +177,89 @@ export function settingsDialog() {
     out,
   );
 }
-$('settings').append(icon(...ICONS.gear));
-$('settings').onclick = settingsDialog;
 setResolver(v => resolveName(v, session.chain));
 export async function resolve(v) {
   return isAddr(v) ? v.toLowerCase() : resolveName(v.trim().toLowerCase(), session.chain);
 }
+// ---- home: your saved Safes and Roles modifiers under one field that searches them or opens a new one ----
+const SEARCH = ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'm20 20-4-4'], CARET = ['m6 9 6 6 6-6'];
+const isRef = (v) => isAddr(v) || /^[^\s/?#]+\.(eth|wei)$/.test(v);
+function openRef(v) {
+  v = v.trim().toLowerCase();
+  if (!isRef(v)) throw Error('Enter a 0x address or a name (name.eth, name.wei).');
+  intent = true; location.hash = '/' + v;
+}
+/** + New (create a Roles modifier: for which Safe?), and ▾ for what you manage now and then. */
+function moreMenu() {
+  const n = Object.keys(labels.all()).length, m = h('div.hmenu', { hidden: true });
+  const item = (ic, text, fn) => h('button', { onclick: () => ((m.hidden = true), fn()) }, icon(...ICONS[ic]), text);
+  put(m, item('tag', n ? 'Labels (' + n + ')' : 'Labels', labelsSheet), item('gear', 'Backup & sync', () => backupDialog(null, reloadHome)), item('server', 'RPC & Etherscan', settingsDialog));
+  return h('div.split', h('button.splitmain', { onclick: newModifier, title: 'Create a Roles modifier for a Safe' }, icon(...ICONS.plus), h('span', 'New')),
+    h('button.splitcaret', { title: 'More: labels, backup & sync, RPC & Etherscan', 'aria-label': 'More', 'aria-haspopup': 'menu', onclick: () => (m.hidden = !m.hidden) }, icon(...CARET)), m);
+}
+document.addEventListener('pointerdown', (e) => document.querySelectorAll('.hmenu').forEach((m) => !m.parentElement.contains(e.target) && (m.hidden = true)));
+/** A Roles modifier belongs to a Safe: pick it (your saved Safes and labels are suggested), then its page opens the wizard. */
+function newModifier() {
+  const { body, close } = sheet('plus', 'Create a Roles modifier'), out = h('div');
+  const safe = h('input', { 'aria-label': 'Safe address', spellcheck: 'false', autocomplete: 'off' }), go = h('button.primary', 'Continue');
+  go.onclick = act(go, async () => { const v = safe.value.trim().toLowerCase(); if (!isRef(v)) throw Error('Enter the Safe’s 0x address or name.'); close(); intent = true; location.hash = '/' + v + '?create'; }, out);
+  safe.onkeydown = (e) => e.key === 'Enter' && go.click();
+  const known = saved.filter((x, i) => saved.findIndex((y) => y.address === x.address) === i).map((x) => [x.address, labels.get(x.address) || network(x.chain)]);
+  put(body, h('p.mut.small', 'A Roles modifier gives roles permissions over a Safe’s assets. Which Safe is it for?'), h('label', 'Safe'), suggestInput(safe, () => known), h('div.actions', h('button', { onclick: close }, 'Cancel'), h('span.grow'), go), out);
+  safe.focus();
+}
+const reloadHome = () => { saved = load('saved', []).filter((x) => x && isAddr(x.address) && Number.isSafeInteger(x.chain)); route(); };
 function home() {
   put($('crumb'));
-  const input = h('input.search', { id: 'open-address', placeholder: 'Search, or open 0x… / name.eth / name.wei', 'aria-label': 'Search or open an address', autocomplete: 'off', spellcheck: 'false' });
-  const rows = h('div'), out = h('div');
-  const open = h('button.primary', 'Open');
-  // Open at its URL; that page asks for a wallet or a chain if it needs one (the gates above).
-  const go = async () => {
-    const v = input.value.trim().toLowerCase();
-    if (!isAddr(v) && !/^[^\s/?#]+\.[a-z]+$/.test(v)) throw Error('Enter a 0x address or a name (name.eth, name.wei).');
-    intent = true; location.hash = '/' + v;
+  if (!saved.length) {
+    const input = h('input.search', { id: 'open-address', placeholder: '0x… / name.eth / name.wei', 'aria-label': 'Open an address', autocomplete: 'off', spellcheck: 'false' }), out = h('div'), open = h('button.primary', 'Open');
+    open.onclick = act(open, async () => openRef(input.value), out);
+    input.onkeydown = (e) => e.key === 'Enter' && (e.preventDefault(), open.click());
+    const n = Object.keys(labels.all()).length;
+    return put(main, h('div.home', h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.')),
+      h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint', 'You’ll connect your wallet to open it.'), out),
+      h('p.importhint', h('span.mut', 'Moving from another device? '), h('button.link', { onclick: () => backupDialog(null, reloadHome) }, 'Import a backup'), n > 0 && [h('span.mut', ' · '), h('button.link', { onclick: labelsSheet }, 'Labels (' + n + ')')], h('span.mut', ' · '), h('button.link', { onclick: settingsDialog }, 'RPC & Etherscan'))));
+  }
+  const q = h('input.search', { id: 'open-address', placeholder: 'Search, or open 0x… / name.eth', 'aria-label': 'Search or open an address', autocomplete: 'off', spellcheck: 'false' });
+  const rows = h('div'), out = h('div'), openRow = h('div');
+  // The network only where it tells you something: not on items of the connected chain.
+  const showChain = (x) => (session.chain ? x.chain !== session.chain : new Set(saved.map((y) => y.chain)).size > 1);
+  const row = (x) => {
+    const title = labels.get(x.address) || short(x.address), name = h('b.name', title);
+    const rename = () => {
+      const inp = h('input.rename', { value: labels.get(x.address) || '', placeholder: 'Name this address', maxlength: 40 });
+      const done = (keep) => (keep && labels.set(x.address, inp.value), draw());
+      inp.onkeydown = (k) => (k.key === 'Enter' ? done(true) : k.key === 'Escape' ? done(false) : null);
+      inp.onblur = () => done(true);
+      inp.onclick = (k) => (k.preventDefault(), k.stopPropagation());
+      name.replaceWith(inp); inp.focus(); inp.select();
+    };
+    const remove = () => { saved = saved.filter((y) => y !== x); save(); draw(); put(out, h('p.small', 'Removed ' + title + '. ', h('button.link', { onclick: () => { saved.push(x); save(); draw(); put(out); } }, 'Undo'))); };
+    return h('a.srow' + (session.chain && x.chain !== session.chain ? '.other' : ''), { href: '#/' + x.address + '?chain=' + x.chain, onclick: () => (intent = true), title: session.chain && x.chain !== session.chain ? 'On ' + network(x.chain) : null },
+      name, labels.get(x.address) && h('code.sa', short(x.address)), showChain(x) && h('span.chip', network(x.chain)), h('span.grow'),
+      h('span.acts', iconButton('edit', 'Rename', rename), iconButton('close', 'Remove from this list', remove)), h('span.go', icon(...ICONS.next)));
   };
-  open.onclick = act(open, go, out);
-  input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); open.click(); } };
   const draw = () => {
-    const q = input.value.toLowerCase().trim();
-    const found = saved.filter(x => (x.address + ' ' + (labels.get(x.address) || '')).toLowerCase().includes(q));
-    put(rows, found.length ? h('div.slist', found.map(x => h('div.srow', h('a.name', { href: '#/' + x.address + '?chain=' + x.chain, onclick: () => (intent = true) }, labels.get(x.address) || short(x.address)), h('span.mut', network(x.chain)), h('span.grow'), h('button.link', { onclick: () => { saved = saved.filter(y => y !== x); save(); draw(); put(out, h('p', 'Removed. ', h('button.link', { onclick: () => { saved.push(x); save(); draw(); put(out); } }, 'Undo'))); } }, 'Remove'), icon(...ICONS.next)))) : h('p.empty', saved.length ? 'No saved address matches.' : 'Safes and Roles modifiers you open will be listed here.'));
+    const s = q.value.trim(), lower = s.toLowerCase();
+    const found = saved.filter((x) => (x.address + ' ' + (labels.get(x.address) || '')).toLowerCase().includes(lower));
+    put(openRow, isRef(lower) && !found.some((x) => x.address === lower) ? h('div.slist.openlist', h('a.srow', { href: '#/' + lower, onclick: (e) => (e.preventDefault(), openRef(s)) }, h('span.mut', 'Open'), h('b.name', isAddr(lower) ? short(lower) : lower), h('span.grow'), h('span.go', icon(...ICONS.next)))) : null);
+    put(rows, found.length ? h('div.slist', found.map(row)) : !isRef(lower) && h('p.empty', 'No saved address matches. Paste a 0x address or a .eth / .wei name to open one.'));
   };
-  input.oninput = draw;
-  put(main, h('div.home' + (saved.length ? '.returning' : ''), !saved.length && h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.')), h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint', 'You’ll connect your wallet to open it.'), out), rows)); draw();
+  q.oninput = draw;
+  q.onkeydown = (e) => {
+    if (e.key === 'Escape') (q.value = ''), draw();
+    if (e.key !== 'Enter') return;
+    const first = (openRow.querySelector('a.srow') || (rows.querySelectorAll('a.srow').length === 1 && rows.querySelector('a.srow')));
+    if (first) first.click();
+  };
+  put(main, h('div.home.returning', h('div.hbar', h('label.sfield', icon(...SEARCH), q), moreMenu()), !session.account && h('p.hnote', 'You’ll connect your wallet when you open one.'), out, openRow, rows));
+  draw();
 }
 export async function route() {
   const epoch = ++session.epoch;
   put($('batch'));
   const path = location.hash.replace(/^#\/?/, '').split('?')[0].split('/');
+  if (/^#import=/.test(location.hash)) { const link = location.hash; history.replaceState(null, '', '#'); backupDialog(link, reloadHome); return home(); }
   if (!path[0]) return home();
   put($('crumb'));
   const ref = decodeURIComponent(path[0]), lower = ref.toLowerCase();
