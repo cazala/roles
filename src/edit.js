@@ -13,6 +13,7 @@ import { proposal, gateway, savedGateway, keepGateway } from './handoff.js';
 import { load, store } from './store.js';
 import { allowancesView } from './allowances.js';
 import { rolesPage } from './roles-list.js';
+import { decode as decodeDraft, apply as applyDraft } from './draftlink.js';
 export const drafts = new Map();
 export const editorHooks = {};
 const id = ctx => ctx.chain + ':' + ctx.address;
@@ -229,17 +230,50 @@ export function review(ctx) {
 export function editBody(ctx,path) {
   if(!ctx.complete||ctx.info.faulty)return null;
   const d=draft(ctx),root=h('div');
+  // A #draft= link (docs/links.md): its changes load into this draft once, all or nothing, to be reviewed like any edit.
+  const link=new URLSearchParams(location.hash.split('?')[1]||'').get('draft');
+  if(link&&d.link!==link){
+    d.link=link;
+    decodeDraft(link).then(plan=>{
+      // With changes already pending, ask first: add the link's to them, or start fresh with only the link's.
+      const pending=diff(d.base,d.value,ctx.address).length;
+      if(pending){d.proposal={ask:pending,plan};return ctx.redraw();}
+      load(plan,d.value);
+    },e=>{d.proposal={error:e.message};ctx.redraw();});
+  }
+  // Load a plan on top of `from` (the pending draft, or the chain's state to start fresh); Undo brings back what was there.
+  function load(plan,from) {
+    try {const next=structuredClone(from),said=applyDraft(next,plan);diff(d.base,next,ctx.address);d.history.push(d.value);d.value=next;d.proposal={note:plan.note,said};}
+    catch(e){d.proposal={error:e.message};}
+    ctx.redraw();
+  }
+  const proposal=()=>{
+    const p=d.proposal;if(!p)return null;
+    const close=h('button.ib',{title:'Hide','aria-label':'Hide',onclick:()=>{d.proposal=null;ctx.redraw();}},'×');
+    if(p.ask)return h('div.proposal',h('div.phead',h('b','This link proposes changes, and you already have '+p.ask+' pending'),close),
+      p.plan.note&&h('p.small',h('span.mut','Note from the link (unverified): '),p.plan.note),
+      h('p.mut.small','Add the link’s changes to yours, or start fresh with only the link’s (yours come back with Undo).'),
+      h('div.actions',h('button.sm',{onclick:()=>load(p.plan,d.value)},'Add to them'),h('button.sm',{onclick:()=>load(p.plan,d.base)},'Start fresh with only this link')));
+    if(p.error)return h('div.proposal.bad',h('div.phead',h('b','This link’s changes could not be loaded'),close),h('p.small',p.error+' Nothing was changed.'));
+    // Everything it asks for may already be onchain (each change states an end result): then there is nothing to send.
+    if(!diff(d.base,d.value,ctx.address).length)return h('div.proposal',h('div.phead',h('b','This link’s changes are already in place'),close),p.note&&h('p.small',h('span.mut','Note from the link (unverified): '),p.note),h('p.mut.small','Everything it asks for matches the chain: there is nothing to send.'),h('details',h('summary','What the link asks for'),h('ol.small',p.said.map(x=>h('li',x)))));
+    return h('div.proposal',h('div.phead',h('b','This link proposes '+p.said.length+' change'+(p.said.length===1?'':'s')),close),
+      p.note&&h('p.small',h('span.mut','Note from the link (unverified): '),p.note),
+      h('p.mut.small','They are loaded below as pending changes, marked where they are. Check each one: nothing happens onchain until you review and send them.'),
+      h('details',h('summary','What the link asks for'),h('ol.small',p.said.map(x=>h('li',x)))));
+  };
   ctx.redraw=()=>{
     const calls=diff(d.base,d.value,ctx.address);
     put($('batch'),calls.length > 0 && h('button',{onclick:()=>review(ctx)},calls.length+' change'+(calls.length===1?'':'s')));
     // The draft, in one bar above the page: how many changes, Undo, Discard, Review.
     const toolbar=calls.length?h('div.draftbar',h('span',calls.length+' pending change'+(calls.length===1?'':'s')),h('span.grow'),d.history.length>0&&h('button.link',{onclick:()=>{d.value=d.history.pop();ctx.redraw();}},'Undo'),h('button.link',{onclick:()=>{drafts.delete(id(ctx));put($('batch'));ctx.refresh();}},'Discard'),h('button.primary.sm',{onclick:()=>review(ctx)},'Review changes')):null;
     const stateCtx={...ctx,state:d.value,base:d.base};
+    const banner=proposal();
     if(path[0]==='role') {
       const key=path[1],member=d.value.roles[key]?.members[session.account]&&d.value.enabled[session.account];
-      put(root,toolbar,roleView({...stateCtx,edit:edits(ctx,key),roleActions:member&&editorHooks.use&&h('button.primary.sm',{onclick:()=>editorHooks.use(ctx,key)},'Use this role')},key));
-    } else if(path[0]==='allowances')put(root,toolbar,allowancesView({...stateCtx,edit:{set:(k,v)=>mutate(ctx,s=>{s.allowances[k]=v;})}}));
-    else put(root,toolbar,rolesPage({...stateCtx,edit:{memberRoles:a=>memberDialog(ctx,a),removeEverywhere:a=>mutate(ctx,s=>{for(const r of Object.values(s.roles))if(r.members[a])r.members[a]=false;if(d.base.defaults[a])s.defaults[a]='0x'+'0'.repeat(64);else delete s.defaults[a];}),restoreMember:a=>mutate(ctx,s=>{for(const r of Object.values(s.roles))if(r.members[a]!==undefined)r.members[a]=!!d.base.roles[r.key]?.members[a];if(d.base.defaults[a])s.defaults[a]=d.base.defaults[a];else delete s.defaults[a];}),newRole:()=>form('New role',[{key:'key',label:'Role name or bytes32 key',info:'Members use a role by its key, a bytes32. A short name (up to 31 characters) becomes the key; you can also paste a 0x… key.'}],v=>{const key=roleKey(v.key);if(d.value.roles[key])throw Error('A role with this name exists.');mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;}),settings:()=>settings(ctx),unwrap:()=>unwrapForm(ctx)}}));
+      put(root,banner,toolbar,roleView({...stateCtx,edit:edits(ctx,key),roleActions:member&&editorHooks.use&&h('button.primary.sm',{onclick:()=>editorHooks.use(ctx,key)},'Use this role')},key));
+    } else if(path[0]==='allowances')put(root,banner,toolbar,allowancesView({...stateCtx,edit:{set:(k,v)=>mutate(ctx,s=>{s.allowances[k]=v;})}}));
+    else put(root,banner,toolbar,rolesPage({...stateCtx,edit:{memberRoles:a=>memberDialog(ctx,a),removeEverywhere:a=>mutate(ctx,s=>{for(const r of Object.values(s.roles))if(r.members[a])r.members[a]=false;if(d.base.defaults[a])s.defaults[a]='0x'+'0'.repeat(64);else delete s.defaults[a];}),restoreMember:a=>mutate(ctx,s=>{for(const r of Object.values(s.roles))if(r.members[a]!==undefined)r.members[a]=!!d.base.roles[r.key]?.members[a];if(d.base.defaults[a])s.defaults[a]=d.base.defaults[a];else delete s.defaults[a];}),newRole:()=>form('New role',[{key:'key',label:'Role name or bytes32 key',info:'Members use a role by its key, a bytes32. A short name (up to 31 characters) becomes the key; you can also paste a 0x… key.'}],v=>{const key=roleKey(v.key);if(d.value.roles[key])throw Error('A role with this name exists.');mutate(ctx,s=>role(s,key));location.hash='/'+ctx.address+'/role/'+key;}),settings:()=>settings(ctx),unwrap:()=>unwrapForm(ctx)}}));
   };
   ctx.redraw(); return root;
 }
