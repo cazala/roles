@@ -9,7 +9,7 @@ import { addRpc, explorerKey, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } 
 import { nameOf, resolveName } from './names.js';
 import { load, store } from './store.js';
 import { labelsSheet, backupDialog } from './manage.js';
-import { SAFE_GATEWAY, LINK } from './handoff.js';
+import { LINK, gateway, savedGateway, keepGateway } from './handoff.js';
 import * as labels from './labels.js';
 
 export const session = { provider: null, account: null, chain: null, epoch: 0 };
@@ -164,9 +164,21 @@ export function settingsDialog() {
   add.onclick = act(add, async () => { const c = await addRpc(url.value); url.value = ''; draw(); put(out, h('p.ok', 'Added for ' + network(c) + '.')); (forget(), route()); }, out);
   const key = h('input', { value: explorerKey(), placeholder: 'Etherscan API key', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Etherscan API key' }), saveKey = h('button', 'Save');
   saveKey.onclick = act(saveKey, async () => { setExplorerKey(key.value); put(out, h('p.ok', key.value.trim() ? 'Etherscan key saved.' : 'Etherscan key removed.')); (forget(), route()); }, out);
+  // safe.wei's gateway, where Safe transactions are handed off and the footer links: one of the built-in ones
+  // (config/links.json) or your own. The default follows this page's gateway, else the first; only a choice is saved.
+  const gws = LINK.safe || [], cur = savedGateway(), gwOut = h('div');
+  const pick = h('select', { 'aria-label': 'safe.wei gateway' }, gws.map((u) => h('option', { value: u }, new URL(u).host)), h('option', { value: '' }, 'Custom…'));
+  const custom = h('input', { placeholder: 'https://your-gateway.example/', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Custom safe.wei gateway' });
+  pick.value = gws.includes(cur) ? cur : ''; custom.value = gws.includes(cur) ? '' : cur; custom.hidden = gws.includes(cur);
+  const choose = (v) => { try { const u = gateway(v); keepGateway(u); put(gwOut, h('p.ok', 'Safe transactions open in ' + new URL(u).host + '.')); foot(); } catch (e) { put(gwOut, bad(e.message)); } };
+  pick.onchange = () => { custom.hidden = !!pick.value; if (pick.value) choose(pick.value); else custom.focus(); };
+  custom.onchange = () => custom.value.trim() && choose(custom.value.trim());
   draw();
   put(
     body,
+    h('p.wsec', 'safe.wei gateway'),
+    h('p.mut.small', 'Where Safe transactions open for the owners to sign.'),
+    h('div.gwpick', pick, custom), gwOut,
     h('p.wsec', 'RPC endpoints'),
     h('p.mut.small', 'Reads on an endpoint’s chain go there instead of your wallet’s RPC. Your wallet still signs.'),
     list,
@@ -174,7 +186,7 @@ export function settingsDialog() {
     h('p.wsec', 'Etherscan API key (optional, faster history)'),
     h('p.mut.small', 'History loads from Etherscan in a few requests. Each event is checked against the chain, but Etherscan must return them all.'),
     h('div.row', key, saveKey),
-    h('p.mut.small', 'Both are kept in this browser.'),
+    h('p.mut.small', 'All kept in this browser.'),
     out,
   );
 }
@@ -285,7 +297,8 @@ export async function route() {
 }
 addEventListener('hashchange', route);
 discover(() => { header(); });
-put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__), h('span.mut', ' · ', h('a', { href: SAFE_GATEWAY, target: '_blank', rel: 'noopener', title: 'Your Safe, served onchain' }, 'safe.wei')), LINK.source && h('span.mut', ' · ', h('a', { href: LINK.source, target: '_blank', rel: 'noopener' }, 'Source')));
+const foot = () => put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__), h('span.mut', ' · ', h('a', { href: savedGateway(), target: '_blank', rel: 'noopener', title: 'Your Safe, served onchain' }, 'safe.wei')), LINK.source && h('span.mut', ' · ', h('a', { href: LINK.source, target: '_blank', rel: 'noopener' }, 'Source')));
+foot();
 header(); route();
 if (remembered() === 'walletconnect') ownerConn.restore().catch(() => {});
 const known = list().find(w => w.key === remembered());
