@@ -50,6 +50,10 @@ npm run deployer -- --anvil http://127.0.0.1:18600
 
 The project ID (`config/walletconnect.json`) and the links to other places (`config/links.json`: `safe`, safe.wei's gateways, where Safe transactions are handed off and the footer links, the one on the same gateway family as the page being used; `source`, the source code) are built into their own tiny first chunk, cut at the `<!--config-->` marker, as in safe.wei. Replacing either changes only that chunk and the app contract; the other chunks keep their addresses, provided the rest is built from the deployed `src/` (tag the deployed commit). The steps are safe.wei's: `docs/deploy.md` → Replacing the WalletConnect project ID. The project must allow `roles.caza.la`, `*.roles-wei.pages.dev` and the gateway domains.
 
+## Vanity address
+
+As in safe.wei, the app contract's address starts with five zero hex digits (`0x00000…`, `VANITY` in `scripts/deploy-lib.mjs`): the app gets its own salt, mined deterministically by counting from 0 (about a million tries, seconds), while the chunks keep the plain salt and so their addresses. `scripts/deploy.mjs` and the deployer page plan the same address independently; `deploy/<chainId>.json` records `salt` and `appSalt`; `--no-vanity` turns it off. Any change to the app contract (a rebuild, a config-only redeploy) gives a new address, mined the same way.
+
 ## Cloudflare Pages
 
 The same `dist/index.html` is published by CI to the `roles-wei` Pages project. Pull requests receive a branch preview; pushes to `main` update `roles.caza.la`. The workflow adds anti-framing, MIME-sniffing and referrer headers. Repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` authorize Pages, while `ALCHEMY_API_KEY` gives fork tests an archive RPC.

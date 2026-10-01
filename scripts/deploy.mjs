@@ -10,7 +10,7 @@
 // to deploy/<chainId>.json. This never touches roles.wei; pointing the name is a
 // separate, manual step (docs/deploy.md).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { compile, deploy, plan, verify } from './deploy-lib.mjs';
+import { compile, deploy, plan, verify, VANITY } from './deploy-lib.mjs';
 
 const arg = (k) => {
   const i = process.argv.indexOf('--' + k);
@@ -27,13 +27,13 @@ const rpc = async (method, params = []) => {
 };
 
 const html = readFileSync(root + 'dist/index.html', 'utf8');
-const p = plan(html, compile(), arg('salt'));
+const p = plan(html, compile(), arg('salt'), { vanity: arg('no-vanity') ? 0 : VANITY });
 const chainId = Number(await rpc('eth_chainId'));
 console.log('chain ' + chainId + ' · page ' + p.size + ' B · ' + p.chunks.length + ' chunk(s) · contentHash ' + p.contentHash);
-console.log('app  ' + p.app);
+console.log('app  ' + p.app + (p.appSalt !== p.salt ? '  (vanity salt ' + p.appSalt + ')' : ''));
 
 if (arg('plan')) {
-  for (const s of p.steps) console.log('\n# ' + s.name + ' → ' + s.address + '\nto   0x4e59b44847b379578588920ca78fbf26c0b4956c\ndata ' + p.salt + s.initcode.slice(2));
+  for (const s of p.steps) console.log('\n# ' + s.name + ' → ' + s.address + '\nto   0x4e59b44847b379578588920ca78fbf26c0b4956c\ndata ' + s.salt + s.initcode.slice(2));
   process.exit(0);
 }
 
@@ -59,7 +59,7 @@ if (arg('from')) {
 
 const gas = await deploy(p, rpc, send, console.log);
 const v = await verify(p, rpc, html);
-const record = { chainId, app: p.app, chunks: p.chunks, salt: p.salt, ...v, gasUsed: String(gas), deployedAt: new Date().toISOString() };
+const record = { chainId, app: p.app, chunks: p.chunks, salt: p.salt, appSalt: p.appSalt, ...v, gasUsed: String(gas), deployedAt: new Date().toISOString() };
 // A fork reports the real chainId; keep its records out of deploy/<chainId>.json.
 const local = /anvil|hardhat/i.test(await rpc('web3_clientVersion').catch(() => ''));
 const out = root + 'deploy/' + (local ? 'local-' : '') + chainId + '.json';
