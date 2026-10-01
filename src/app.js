@@ -9,6 +9,7 @@ import { addRpc, explorerKey, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } 
 import { nameOf, resolveName } from './names.js';
 import { load, store } from './store.js';
 import { labelsSheet, backupDialog } from './manage.js';
+import { SAFE_GATEWAY, LINK } from './handoff.js';
 import * as labels from './labels.js';
 
 export const session = { provider: null, account: null, chain: null, epoch: 0 };
@@ -284,7 +285,7 @@ export async function route() {
 }
 addEventListener('hashchange', route);
 discover(() => { header(); });
-put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__));
+put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__), h('span.mut', ' · ', h('a', { href: SAFE_GATEWAY, target: '_blank', rel: 'noopener', title: 'Your Safe, served onchain' }, 'safe.wei')), LINK.source && h('span.mut', ' · ', h('a', { href: LINK.source, target: '_blank', rel: 'noopener' }, 'Source')));
 header(); route();
 if (remembered() === 'walletconnect') ownerConn.restore().catch(() => {});
 const known = list().find(w => w.key === remembered());

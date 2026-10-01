@@ -5,7 +5,16 @@ import { safeModules, read, MULTISEND } from './roles.js';
 import { calldata } from './roles.js';
 import { B, cd } from './abi.js';
 import { S } from './sel.js';
-export function gateway(value = 'https://safe.wei.limo/') {
+import { load, store } from './store.js';
+// Links from the config chunk (config/links.json; replacing them redeploys only that chunk): safe.wei on the same
+// gateway family as this page (roles.wei.is → safe.wei.is), else the first, and the source code. A gateway you
+// typed yourself is kept (savedGateway); the default is never saved, so a changed one reaches you.
+export const LINK = typeof LINKS === 'object' && LINKS ? LINKS : {};
+const family = (u) => '.' + new URL(u).hostname.split('.').slice(1).join('.');
+export const SAFE_GATEWAY = (LINK.safe || []).find((u) => typeof location === 'object' && location.hostname.endsWith(family(u))) || (LINK.safe || [])[0] || 'https://safe.wei.limo/';
+export const savedGateway = () => load('gateway', '') || SAFE_GATEWAY;
+export const keepGateway = (base) => store('gateway', base === SAFE_GATEWAY ? '' : base);
+export function gateway(value = SAFE_GATEWAY) {
   const url = new URL(value);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost','127.0.0.1'].includes(url.hostname))) throw Error('Use an HTTPS safe.wei gateway.');
   if(url.username || url.password) throw Error('Gateway must not contain credentials');

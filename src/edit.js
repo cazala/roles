@@ -9,7 +9,7 @@ import { diff, SIG } from './diff.js';
 import { roleKey, keyName, role, target, json, signature, decodeEvent, replay, quantity, metadata } from './roles.js';
 import { isAddr, ZERO } from './abi.js';
 import { parseValue } from './abicoder.js';
-import { proposal, gateway } from './handoff.js';
+import { proposal, gateway, savedGateway, keepGateway } from './handoff.js';
 import { load, store } from './store.js';
 import { allowancesView } from './allowances.js';
 import { rolesPage } from './roles-list.js';
@@ -196,7 +196,7 @@ export function review(ctx) {
   copyAll.onclick=async()=>{await Promise.all(Object.values(loading));toClipboard(changesText(ctx,d,calls,names)).then(()=>{put(copyAll,'✓ Copied');setTimeout(()=>put(copyAll,'Copy changes'),1500);},()=>{});};
   const direct=d.base.owner===session.account, supported=direct||ctx.ownerSafe;
   if(!supported){body.append(warn('This modifier owner is neither the connected wallet nor a readable Safe. Review the calls above, then use a tool that can act for '+d.base.owner+'.'),h('div.actions.rvfoot',copyAll));return;}
-  const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:load('gateway','https://safe.wei.limo/')});
+  const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:savedGateway()});
   const nonce=h('input',{'aria-label':'Safe nonce',placeholder:'Current Safe nonce',inputmode:'numeric'});
   const foot=h('div.actions.rvfoot'),out=h('div');
   if(direct) {
@@ -214,7 +214,7 @@ export function review(ctx) {
       await preflight(ctx,d);
       const base=gateway(gatewayInput.value),result=await proposal(ctx.request,ctx.chain,d.base.owner,calls,base,nonce.value);
       if(mine!==seq)return;
-      store('gateway',base);
+      keepGateway(base);
       put(foot,h('a.btn.primary',{href:result.url,target:'_blank',rel:'noopener'},'Open in safe.wei to approve'),copyButton('Copy link',result.url),copyAll);
       put(out,h('p.mut.small.rvsend','Send the link to the Safe’s owners: they check it, sign and execute it in safe.wei.'));
     } catch(e) {

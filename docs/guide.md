@@ -31,3 +31,5 @@ Transaction allowances optionally constrain total ETH value or the number of cal
 Wallet rejection, insufficient gas funds, unavailable history and unsupported RPC methods are described with a next step. Disconnecting returns an address route to the connection gate without losing it, and an address on a different chain opens a switch-chain gate before any reads.
 
 For production, see [Deploying roles.wei](deploy.md). The deploy script and browser-wallet LAN deployer both derive the immutable CREATE2 addresses from the exact built page, skip completed steps and verify `html()` byte for byte. Only the name owner performs the mainnet deployment and points `roles.wei`.
+
+The footer links to safe.wei and to the source code. Links to safe.wei (the footer, and Safe transaction hand-offs unless you typed another gateway in Safe hand-off options) use the gateway on the same family as this page: roles.wei.is → safe.wei.is, roles.wei.limo → safe.wei.limo, else the first. These links are in the config chunk (`config/links.json`), so changing them redeploys only that chunk.

@@ -11,15 +11,21 @@ const id = digest.digest('hex').slice(0, 10);
 const js = (await build({ entryPoints: [root + 'src/app.js'], bundle: true, minify: true, format: 'iife', target: 'es2020', write: false, legalComments: 'none', charset: 'utf8', define: { __BUILD__: JSON.stringify(id) } })).outputFiles[0].text.trim();
 const css = (await transform(read('src/style.css'), { loader: 'css', minify: true })).code.trim();
 if (/<\/script/i.test(js)) throw Error('Unsafe inline script terminator');
-// Config that may need replacing after deployment (the WalletConnect project ID) lives outside src/ and goes
+// Config that may need replacing after deployment (the WalletConnect project ID, links to safe.wei and the source) lives outside src/ and goes
 // into its own tiny first chunk, cut at <!--config--> (scripts/deploy-lib.mjs): replacing it redeploys only
 // that chunk and the app contract.
 const config = JSON.parse(read('config/walletconnect.json'));
 if (!/^[0-9a-f]{32}$/.test(config.projectId)) throw Error('config/walletconnect.json: projectId must be 32 hex characters');
+// Links to other places (safe.wei's gateways, where Safe transactions are handed off, and the source code), in the
+// same first chunk: config/links.json.
+const links = JSON.parse(read('config/links.json'));
+const url = (u) => typeof u === 'string' && /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+\/[\w./-]*$/.test(u);
+if (!Array.isArray(links.safe) || !links.safe.length || !links.safe.every((u) => url(u) && u.endsWith('/')) || !url(links.source + '/'))
+  throw Error('config/links.json: safe must be https:// gateway URLs ending in /, source an https:// URL');
 const OPEN = '<!doctype html><html lang="en"><head><meta charset="utf-8">';
 const shell = read('src/index.html').replace(/>\s+</g, '><');
 if (!shell.startsWith(OPEN)) throw Error('src/index.html must start with ' + OPEN);
-const html = OPEN + '<script>var WC_PROJECT="' + config.projectId + '"</script><!--config-->' + shell.slice(OPEN.length).replace('<!--CSS-->', () => '<style>' + css + '</style>').replace('<!--JS-->', () => '<script>' + js + '</script>');
+const html = OPEN + '<script>var WC_PROJECT="' + config.projectId + '",LINKS=' + JSON.stringify({ safe: links.safe, source: links.source }) + '</script><!--config-->' + shell.slice(OPEN.length).replace('<!--CSS-->', () => '<style>' + css + '</style>').replace('<!--JS-->', () => '<script>' + js + '</script>');
 for (const re of [/<script[^>]+src\s*=/i, /<link[^>]+rel=["']?stylesheet/i, /@import/i, /\b(?:XMLHttpRequest|EventSource|importScripts)\s*\(/, /\bimport\s*\(/, /(?:src|poster)\s*=\s*["']?(?:https?:)?\/\//i]) {
   if (re.test(html)) throw Error('Remote resource/network loader check failed: ' + re);
 }
