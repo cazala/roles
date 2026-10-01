@@ -642,3 +642,13 @@ a.srow.other { opacity: .6; }
 .split { position: relative; }
 .returning > div > .slist { margin-top: 14px; }
 .lrow { min-height: 40px; }
+footer#foot a { color: inherit; }
+footer#foot a:hover { color: var(--fg); }
+.gwpick { display: flex; flex-direction: column; gap: 8px; }
+/* As in safe.wei: the first-visit connect hint, the panel's second way in, and a sheet's lead sentence. */
+.panel .connecthint { margin: 8px 0 0; font-size: 12px; color: var(--mut); }
+p.lead { margin: 4px 0 8px; }
+.panel .alt { display: flex; align-items: center; gap: 4px; margin: 16px -18px -16px; padding: 12px 18px; border-top: 1px solid var(--line); border-radius: 0 0 14px 14px; color: var(--fg); text-decoration: none; font-size: 14px; }
+.panel a.alt:hover { background: var(--bg); }
+.panel a.alt svg { width: 14px; height: 14px; margin-left: auto; color: var(--mut); }
+.panel p.alt { margin-bottom: -16px; }

@@ -9,6 +9,7 @@ import { addRpc, explorerKey, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } 
 import { nameOf, resolveName } from './names.js';
 import { load, store } from './store.js';
 import { labelsSheet, backupDialog } from './manage.js';
+import { LINK, gateway, savedGateway, keepGateway } from './handoff.js';
 import * as labels from './labels.js';
 
 export const session = { provider: null, account: null, chain: null, epoch: 0 };
@@ -159,21 +160,33 @@ export function settingsDialog() {
     const m = Object.entries(rpcs());
     put(list, m.length ? h('div.slist.rpcs', m.map(([c, u]) => h('div.srow', h('b', network(Number(c))), h('code.sa', host(u)), h('span.grow'), h('button.link', { onclick: () => (removeRpc(c), draw(), (forget(), route())) }, 'Remove')))) : h('p.mut.small', 'None: reads go through your wallet.'));
   };
-  const url = h('input', { placeholder: 'https://… (Alchemy, Infura, your node)', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'RPC URL' }), add = h('button', 'Add');
+  const url = h('input', { placeholder: 'Endpoint URL (Alchemy, Infura, your node)', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'RPC URL' }), add = h('button', 'Add');
   add.onclick = act(add, async () => { const c = await addRpc(url.value); url.value = ''; draw(); put(out, h('p.ok', 'Added for ' + network(c) + '.')); (forget(), route()); }, out);
   const key = h('input', { value: explorerKey(), placeholder: 'Etherscan API key', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Etherscan API key' }), saveKey = h('button', 'Save');
   saveKey.onclick = act(saveKey, async () => { setExplorerKey(key.value); put(out, h('p.ok', key.value.trim() ? 'Etherscan key saved.' : 'Etherscan key removed.')); (forget(), route()); }, out);
+  // safe.wei's gateway, where Safe transactions are handed off and the footer links: one of the built-in ones
+  // (config/links.json) or your own. The default follows this page's gateway, else the first; only a choice is saved.
+  const gws = LINK.safe || [], cur = savedGateway(), gwOut = h('div');
+  const pick = h('select', { 'aria-label': 'safe.wei gateway' }, gws.map((u) => h('option', { value: u }, new URL(u).host)), h('option', { value: '' }, 'Custom…'));
+  const custom = h('input', { placeholder: 'https://your-gateway.example/', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Custom safe.wei gateway' });
+  pick.value = gws.includes(cur) ? cur : ''; custom.value = gws.includes(cur) ? '' : cur; custom.hidden = gws.includes(cur);
+  const choose = (v) => { try { const u = gateway(v); keepGateway(u); put(gwOut, h('p.ok', 'Safe transactions open in ' + new URL(u).host + '.')); foot(); } catch (e) { put(gwOut, bad(e.message)); } };
+  pick.onchange = () => { custom.hidden = !!pick.value; if (pick.value) choose(pick.value); else custom.focus(); };
+  custom.onchange = () => custom.value.trim() && choose(custom.value.trim());
   draw();
   put(
     body,
-    h('p.wsec', 'RPC endpoints'),
+    h('div.bsec', h('b', 'safe.wei gateway')),
+    h('p.mut.small', 'Where Safe transactions open for the owners to sign.'),
+    h('div.gwpick', pick, custom), gwOut,
+    h('div.bsec', h('b', 'RPC endpoints')),
     h('p.mut.small', 'Reads on an endpoint’s chain go there instead of your wallet’s RPC. Your wallet still signs.'),
     list,
     h('div.row', url, add),
-    h('p.wsec', 'Etherscan API key (optional, faster history)'),
+    h('div.bsec', h('b', 'Etherscan API key'), h('span.mut.small', ' · optional, faster history')),
     h('p.mut.small', 'History loads from Etherscan in a few requests. Each event is checked against the chain, but Etherscan must return them all.'),
     h('div.row', key, saveKey),
-    h('p.mut.small', 'Both are kept in this browser.'),
+    h('p.mut.small', 'All kept in this browser.'),
     out,
   );
 }
@@ -203,21 +216,23 @@ function newModifier() {
   const { body, close } = sheet('plus', 'Create a Roles modifier'), out = h('div');
   const safe = h('input', { 'aria-label': 'Safe address', spellcheck: 'false', autocomplete: 'off' }), go = h('button.primary', 'Continue');
   go.onclick = act(go, async () => { const v = safe.value.trim().toLowerCase(); if (!isRef(v)) throw Error('Enter the Safe’s 0x address or name.'); close(); intent = true; location.hash = '/' + v + '?create'; }, out);
-  safe.onkeydown = (e) => e.key === 'Enter' && go.click();
+  // Enter continues, unless the suggestions used it to pick one (they handle it later in the same keypress).
+  safe.onkeydown = (e) => { if (e.key === 'Enter') setTimeout(() => e.defaultPrevented || go.click()); }; // never return false here: that cancels every keystroke
   const known = saved.filter((x, i) => saved.findIndex((y) => y.address === x.address) === i).map((x) => [x.address, labels.get(x.address) || network(x.chain)]);
-  put(body, h('p.mut.small', 'A Roles modifier gives roles permissions over a Safe’s assets. Which Safe is it for?'), h('label', 'Safe'), suggestInput(safe, () => known), h('div.actions', h('button', { onclick: close }, 'Cancel'), h('span.grow'), go), out);
+  put(body, h('p.mut.small', 'A Roles modifier gives roles permissions over a Safe’s assets. Which Safe is it for?'), h('label', 'Safe'), suggestInput(safe, () => known), h('div.dfoot', h('span.grow'), h('button', { onclick: close }, 'Cancel'), go), out);
   safe.focus();
 }
 const reloadHome = () => { saved = load('saved', []).filter((x) => x && isAddr(x.address) && Number.isSafeInteger(x.chain)); route(); };
 function home() {
   put($('crumb'));
   if (!saved.length) {
-    const input = h('input.search', { id: 'open-address', placeholder: '0x… / name.eth / name.wei', 'aria-label': 'Open an address', autocomplete: 'off', spellcheck: 'false' }), out = h('div'), open = h('button.primary', 'Open');
+    const input = h('input.search', { id: 'open-address', placeholder: 'Address 0x… or name.eth / name.wei', 'aria-label': 'Open an address', autocomplete: 'off', spellcheck: 'false' }), out = h('div'), open = h('button.primary', 'Open');
     open.onclick = act(open, async () => openRef(input.value), out);
-    input.onkeydown = (e) => e.key === 'Enter' && (e.preventDefault(), open.click());
+    input.onkeydown = (e) => { if (e.key === 'Enter') e.preventDefault(), open.click(); }; // never return false here: that cancels every keystroke
     const n = Object.keys(labels.all()).length;
-    return put(main, h('div.home', h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.')),
-      h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint', 'You’ll connect your wallet to open it.'), out),
+    return put(main, h('div.home', h('div.hero', h('span.mark', icon(...ICONS.people)), h('h1', 'roles.wei'), h('p', 'Manage Safe permissions, straight from the chain.', h('br'), 'No servers, everything stays in your browser.')),
+      h('div.panel', h('label', { for: 'open-address' }, 'Open a Safe or Roles modifier'), h('div.row', input, open), !session.account && h('p.fhint.connecthint', 'You’ll connect your wallet to open it.'), out,
+        h('a.alt', { href: '#', onclick: (e) => (e.preventDefault(), newModifier()) }, h('span.mut', 'New to Roles?'), ' ', h('b', 'Create a modifier'), icon(...ICONS.next))),
       h('p.importhint', h('span.mut', 'Moving from another device? '), h('button.link', { onclick: () => backupDialog(null, reloadHome) }, 'Import a backup'), n > 0 && [h('span.mut', ' · '), h('button.link', { onclick: labelsSheet }, 'Labels (' + n + ')')], h('span.mut', ' · '), h('button.link', { onclick: settingsDialog }, 'Settings'))));
   }
   const q = h('input.search', { id: 'open-address', placeholder: 'Search, or open 0x… / name.eth', 'aria-label': 'Search or open an address', autocomplete: 'off', spellcheck: 'false' });
@@ -284,7 +299,8 @@ export async function route() {
 }
 addEventListener('hashchange', route);
 discover(() => { header(); });
-put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__));
+const foot = () => put($('foot'), h('span.mut', 'roles.wei · build ' + __BUILD__), h('span.mut', ' · ', h('a', { href: savedGateway(), target: '_blank', rel: 'noopener', title: 'Your Safe, served onchain' }, 'safe.wei')), LINK.source && h('span.mut', ' · ', h('a', { href: LINK.source, target: '_blank', rel: 'noopener' }, 'source')));
+foot();
 header(); route();
 if (remembered() === 'walletconnect') ownerConn.restore().catch(() => {});
 const known = list().find(w => w.key === remembered());

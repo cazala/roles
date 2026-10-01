@@ -152,7 +152,7 @@ function abiDialog(ctx, address, done) {
   put(body,
     h('p.mut.small', 'The ABI names this contract’s functions and types their parameters, so you can pick functions and enter values by type. It is a label: what executes is the selector, and a name is shown only when it hashes to that selector. Kept in this browser.'),
     h('label', 'Contract name'), nameIn, h('label', 'ABI'), abiIn, file, err,
-    h('div.actions', h('button', { onclick: () => file.click() }, 'Upload .json'), had && h('button.link', { onclick: () => (store(pastedKey(ctx.chain, address), ''), store(nameKey(ctx.chain, address), ''), close(), done()) }, 'Remove'), h('span.grow'), h('button', { onclick: close }, 'Cancel'), h('button.primary', { onclick: () => save(abiIn.value) }, 'Save')));
+    h('div.dfoot', h('button', { onclick: () => file.click() }, 'Upload .json'), had && h('button.link', { onclick: () => (store(pastedKey(ctx.chain, address), ''), store(nameKey(ctx.chain, address), ''), close(), done()) }, 'Remove'), h('span.grow'), h('button', { onclick: close }, 'Cancel'), h('button.primary', { onclick: () => save(abiIn.value) }, 'Save')));
   abiIn.focus();
 }
 function targetView(t, ctx, key) {

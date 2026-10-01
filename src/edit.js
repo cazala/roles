@@ -9,7 +9,7 @@ import { diff, SIG } from './diff.js';
 import { roleKey, keyName, role, target, json, signature, decodeEvent, replay, quantity, metadata } from './roles.js';
 import { isAddr, ZERO } from './abi.js';
 import { parseValue } from './abicoder.js';
-import { proposal, gateway } from './handoff.js';
+import { proposal, gateway, savedGateway, keepGateway } from './handoff.js';
 import { load, store } from './store.js';
 import { allowancesView } from './allowances.js';
 import { rolesPage } from './roles-list.js';
@@ -37,7 +37,7 @@ export function form(title, fields, submit) {
     if (f.hint) body.append(h('p.fhint',f.hint));
   }
   const save=h('button.primary','Add to pending changes');save.onclick=act(save,async()=>{await submit(Object.fromEntries(Object.entries(controls).map(([k,v])=>[k,v.value])));close();},out);
-  body.append(out,h('div.actions',h('button',{onclick:close},'Cancel'),save));
+  body.append(out,h('div.dfoot',h('span.grow'),h('button',{onclick:close},'Cancel'),save));
   Object.values(controls)[0]?.focus();
 }
 const OPTIONS_HINT='CALL is a normal call. DELEGATECALL runs the target’s code as the Safe itself, so it can change anything in the Safe: allow it only for trusted batch contracts such as MultiSend. “With ETH” also lets the role send the Safe’s ETH.';
@@ -82,7 +82,7 @@ function memberDialog(ctx,a) {
   put(body,!a&&[h('label','Member address'),suggestInput(who,()=>labelled(Object.keys(d.value.enabled).filter(x=>roles.some(r=>r.members[x]))))],
     infoLabel('Roles','The roles this account or Safe may use. Each role’s page shows what it allows.'),roles.length?h('div.checks',boxes.map(b=>b.row)):h('p.mut.small','No roles yet: create one first.'),
     infoLabel('Default role','Calls that name no role (execTransactionFromModule) use the member’s default role. None: the member must name a role in each call.'),def,
-    h('div.actions',h('button',{onclick:close},'Cancel'),h('span.grow'),save),out);
+    h('div.dfoot',h('span.grow'),h('button',{onclick:close},'Cancel'),save),out);
   (a?boxes[0]?.c:who)?.focus();
 }
 function optionsForm(title,value,save){form(title,[{key:'options',label:'Execution options',value,options:opOptions,info:OPTIONS_HINT}],v=>save(Number(v.options)));}
@@ -196,7 +196,7 @@ export function review(ctx) {
   copyAll.onclick=async()=>{await Promise.all(Object.values(loading));toClipboard(changesText(ctx,d,calls,names)).then(()=>{put(copyAll,'✓ Copied');setTimeout(()=>put(copyAll,'Copy changes'),1500);},()=>{});};
   const direct=d.base.owner===session.account, supported=direct||ctx.ownerSafe;
   if(!supported){body.append(warn('This modifier owner is neither the connected wallet nor a readable Safe. Review the calls above, then use a tool that can act for '+d.base.owner+'.'),h('div.actions.rvfoot',copyAll));return;}
-  const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:load('gateway','https://safe.wei.limo/')});
+  const gatewayInput=h('input',{'aria-label':'safe.wei gateway',value:savedGateway()});
   const nonce=h('input',{'aria-label':'Safe nonce',placeholder:'Current Safe nonce',inputmode:'numeric'});
   const foot=h('div.actions.rvfoot'),out=h('div');
   if(direct) {
@@ -214,7 +214,7 @@ export function review(ctx) {
       await preflight(ctx,d);
       const base=gateway(gatewayInput.value),result=await proposal(ctx.request,ctx.chain,d.base.owner,calls,base,nonce.value);
       if(mine!==seq)return;
-      store('gateway',base);
+      keepGateway(base);
       put(foot,h('a.btn.primary',{href:result.url,target:'_blank',rel:'noopener'},'Open in safe.wei to approve'),copyButton('Copy link',result.url),copyAll);
       put(out,h('p.mut.small.rvsend','Send the link to the Safe’s owners: they check it, sign and execute it in safe.wei.'));
     } catch(e) {

@@ -1,7 +1,7 @@
 import { h, put, addr, warn, act, sheet, copyButton, friendlyError } from './ui.js';
 import { session, route } from './app.js';
 import { verifyCreation, creationCalls } from './create-plan.js';
-import { proposal, gateway } from './handoff.js';
+import { proposal, gateway, savedGateway, keepGateway } from './handoff.js';
 import { identify, metadata, read, FACTORY } from './roles.js';
 import { load, store } from './store.js';
 
@@ -25,7 +25,7 @@ function wizard(ctx, resume) {
   const bar = h('ol.wsteps'), page = h('div.wpage'), out = h('div'), foot = h('div.wfoot');
   put(body, bar, page, out, foot);
   const safe = ctx.address;
-  const v = { owner: safe, avatar: safe, target: safe, salt: randomSalt(), how: resume ? 'enable' : 'safe', nonce: '', gateway: load('gateway', 'https://safe.wei.limo/'), plan: resume ? { proxy: resume.address } : null, deployed: resume ? resume.address : null, result: null };
+  const v = { owner: safe, avatar: safe, target: safe, salt: randomSalt(), how: resume ? 'enable' : 'safe', nonce: '', gateway: savedGateway(), plan: resume ? { proxy: resume.address } : null, deployed: resume ? resume.address : null, result: null };
   const steps = resume ? [review, done] : [setup, how, review, done], names = resume ? ['Review', 'Done'] : ['Setup', 'How', 'Review', 'Done'];
   let at = 0;
   const go = (i) => ((at = i), put(out), draw());
@@ -46,7 +46,7 @@ function wizard(ctx, resume) {
       if (v.how === 'wallet') return go(at + 1); // the deployment runs, with its progress, on the Done step
       const calls = v.how === 'enable' ? [v.calls[1]] : v.calls, base = gateway(v.gateway);
       v.result = await proposal(ctx.request, ctx.chain, safe, calls, base, v.nonce);
-      store('gateway', base);
+      keepGateway(base);
       go(at + 1);
     }, out);
     return [back() || h('span'), b];
@@ -119,7 +119,7 @@ function wizard(ctx, resume) {
       stage('Preparing the link to enable it…');
       const base = gateway(v.gateway);
       v.result = await proposal(ctx.request, ctx.chain, safe, [creationCalls(safe, fresh)[1]], base, v.nonce);
-      store('gateway', base);
+      keepGateway(base);
       draw();
     })().catch((e) => { v.failed = true; box.append(warn(friendlyError(e))); put(foot, h('button', { onclick: () => ((v.failed = false), go(at - 1)) }, 'Back to review')); });
     return box;

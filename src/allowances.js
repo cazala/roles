@@ -150,7 +150,7 @@ export async function allowanceDialog(ctx, key) {
     money('balance', 'Available now', 'What can be spent right now. Each use through this allowance subtracts from it; a use that would go below zero fails.', v ? v.balance : null, '1000'),
     h('div.afield', infoLabel('Refill', 'One-time budgets are spent once. Refilling budgets add an amount every period.'), kind),
     refillBox, summary,
-    h('div.actions', h('button', { onclick: close }, 'Cancel'), h('span.grow'), save), out);
+    h('div.dfoot', h('span.grow'), h('button', { onclick: close }, 'Cancel'), save), out);
   save.onclick = act(save, async () => {
     const k = key || roleKey(name.value.trim());
     if (!key && ctx.state.allowances[k]) throw Error('An allowance with this name exists. Edit it instead.');
