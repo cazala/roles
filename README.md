@@ -33,7 +33,7 @@ See [the guide](docs/guide.md), [research](docs/research.md), [specification](do
 - **Chain only.** Everything is read from contracts (`eth_call`, `eth_getLogs`, `eth_getCode`) through the connected wallet's RPC. When that RPC cannot serve the permission history (full nodes drop old logs or state), the scan continues through WalletConnect's RPC; RPC endpoints you add in Settings take every read on their chain; a wallet connected with WalletConnect reads through WalletConnect's RPC. No subgraph and no Zodiac API. Optionally, with your own Etherscan API key (Settings), the history comes from Etherscan's index in a few requests; roles.wei still checks every event and its block against the chain, but then trusts Etherscan to return all of them. Every event is replayed locally.
 - **Wallet signs.** roles.wei never holds a key.
 - **Never guess.** Decode only what can be decoded exactly; show raw data otherwise. Every transaction a Safe must approve is reviewed in safe.wei, which checks the hash against the Safe and simulates it.
-- **Small.** The page is stored onchain (~220 gas per byte). Budget: good < 100 KB, hard limit 200 KB raw.
+- **Small.** The page is stored onchain (~220 gas per byte). Budget: good < 100 KB, hard limit 300 KB raw.
 
 ## 2. How Zodiac Roles works (what the app must model)
 

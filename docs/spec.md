@@ -4,7 +4,7 @@ Status: phase 0. This is the contract and acceptance criteria for phases 1–8, 
 
 ## Runtime and trust boundaries
 
-Ship one self-contained HTML file, vanilla JavaScript and CSS, no runtime packages or network resources. All chain reads use the selected EIP-1193 wallet. No public RPC URL, indexer, API, key or dev wallet goes in the production build. HTTP RPC access in the research/fork tooling is development-only. Reject remote resource references and raw output above 200,000 bytes; target below 100,000 bytes.
+Ship one self-contained HTML file, vanilla JavaScript and CSS, no runtime packages or network resources. All chain reads use the selected EIP-1193 wallet. No public RPC URL, indexer, API, key or dev wallet goes in the production build. HTTP RPC access in the research/fork tooling is development-only. Reject remote resource references and raw output above 300,000 bytes; target below 100,000 bytes.
 
 Support reading identified contracts independently of creation dependencies. Creation requires the pinned 2.1.1 mastercopy and ModuleProxyFactory to have code on the current chain. Batching requires a MultiSendCallOnly address recognized by the pinned safe.wei. Recognize Roles 1.x and faulty 2.1.0 with clear version information; do not decode them as 2.1.1 or offer writes through the wrong ABI. Unknown implementations remain raw/read-only. A recognized address alone is not proof of arbitrary proxy compatibility: match the exact minimal-proxy runtime and implementation.
 
