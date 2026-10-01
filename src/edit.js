@@ -241,6 +241,8 @@ export function editBody(ctx,path) {
     const p=d.proposal;if(!p)return null;
     const close=h('button.ib',{title:'Hide','aria-label':'Hide',onclick:()=>{d.proposal=null;ctx.redraw();}},'×');
     if(p.error)return h('div.proposal.bad',h('div.phead',h('b','This link’s changes could not be loaded'),close),h('p.small',p.error+' Nothing was changed.'));
+    // Everything it asks for may already be onchain (each change states an end result): then there is nothing to send.
+    if(!diff(d.base,d.value,ctx.address).length)return h('div.proposal',h('div.phead',h('b','This link’s changes are already in place'),close),p.note&&h('p.small',h('span.mut','Note from the link (unverified): '),p.note),h('p.mut.small','Everything it asks for matches the chain: there is nothing to send.'),h('details',h('summary','What the link asks for'),h('ol.small',p.said.map(x=>h('li',x)))));
     return h('div.proposal',h('div.phead',h('b','This link proposes '+p.said.length+' change'+(p.said.length===1?'':'s')),close),
       p.note&&h('p.small',h('span.mut','Note from the link (unverified): '),p.note),
       h('p.mut.small','They are loaded below as pending changes, marked where they are. Check each one: nothing happens onchain until you review and send them.'),
