@@ -57,7 +57,7 @@ Everything below was learned the hard way while building safe.wei (`~/Code/safe`
 
 ### Build, size, deploy
 
-- esbuild bundles everything into one HTML file; the build fails on any remote resource reference and above 200 KB raw. It prints a size report; keep `docs/size.md` updated per feature.
+- esbuild bundles everything into one HTML file; the build fails on any remote resource reference and above 300 KB raw (raised from 200 KB in 2026-09, when the editor grew). It prints a size report; keep `docs/size.md` updated per feature.
 - The page is stored as 24,575-byte chunks (SSTORE2-style data contracts) behind an ERC-8244 `html()` contract, all through the CREATE2 deployer `0x4e59b44847b379578588920cA78FbF26c0B4956C`: addresses depend only on bytes and salt. Cost is roughly 220 gas per page byte. Pin per-transaction gas at 15,000,000 (EIP-7825's cap is 16,777,216).
 - **Each gateway origin has its own `localStorage`** (`safe.wei.limo` and a `w3link` URL are different sites), which is why Backup & sync exists. Prefix keys (`roles.wei:`), wrap every access in try/catch, and never make storage required.
 - Links are built from `location.href.split('#')[0]`, so they point at whichever gateway the user is on; the fragment is the payload and works on any gateway.
