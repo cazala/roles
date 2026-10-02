@@ -7,7 +7,7 @@ description: Propose Zodiac Roles permissions for a Safe (who may call which con
 
 roles.wei manages Zodiac Roles 2.1.1 modifiers: the module that lets a role's members call specific functions through a Safe, with conditions on the parameters and allowances on amounts, without the Safe's full threshold. It runs in the browser and reads the chain through the user's wallet. **You never apply, sign or send anything.** A link only proposes: the person reviews every change in roles.wei's editor, then the modifier's owner applies it (usually the Safe itself, through a safe.wei transaction the owners sign).
 
-Gateways: `https://roles.wei.limo/`, `https://roles.wei.is/`, `https://roles.caza.la/`. The full reference is `docs/links.md` in the roles.wei repository.
+Gateway: use `https://roles.caza.la/` unless the user uses another one. `https://roles.wei.limo/` and `https://roles.wei.is/` serve the onchain app once `roles.wei` is deployed; until then they do not load. The full reference is `docs/links.md` in the roles.wei repository.
 
 ## Pick the right link
 
@@ -46,7 +46,7 @@ A draft is JSON, `{ "v": 1, "note": "<why, in one sentence>", "ops": [ … ] }`.
 Build and check it, in a checkout of the roles.wei repository:
 
 ```bash
-node scripts/draft-link.mjs plan.json --modifier 0x… --chain 1 [--gateway https://roles.wei.limo/]
+node scripts/draft-link.mjs plan.json --modifier 0x… --chain 1 [--gateway https://roles.caza.la/]
 ```
 
 It refuses a malformed plan (naming the change at fault), builds every change as the editor would, lists them in words, and prints the link. Never hand-encode `draft=`.

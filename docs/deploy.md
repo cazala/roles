@@ -44,7 +44,8 @@ npm run deployer -- --anvil http://127.0.0.1:18600
 
 5. Print the current name owner, resolution and exact pointing transaction with `node scripts/name.mjs --rpc <mainnet-rpc> --app <app>`. This helper is read-only.
 6. The reported owner sends the printed `setAddr(uint256,address)` transaction. Re-run the helper until it says both that `html()` matches and `roles.wei` already points at the app. Open `https://roles.wei.limo/` and perform a final read and a small end-to-end action.
-7. Commit `deploy/1.json`, record the app, content hash, code hash and gas in the README, and tag that deployed commit (for example `deployed-1`).
+7. **Agent links:** once `https://roles.wei.limo/` loads the app, `skills/roles-wei/SKILL.md` and `scripts/draft-link.mjs` can default to it again (they use `https://roles.caza.la/` until `roles.wei` is deployed).
+8. Commit `deploy/1.json`, record the app, content hash, code hash and gas in the README, and tag that deployed commit (for example `deployed-1`).
 
 ## WalletConnect project ID
 
