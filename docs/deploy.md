@@ -57,7 +57,7 @@ As in safe.wei, the app contract's address starts with five zero hex digits (`0x
 
 ## Cloudflare Pages
 
-The same `dist/index.html` is published by CI to the `roles-wei` Pages project. Pull requests receive a branch preview; pushes to `main` update `roles.caza.la`. The workflow adds anti-framing, MIME-sniffing and referrer headers. Repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` authorize Pages, while `ALCHEMY_API_KEY` gives fork tests an archive RPC.
+The same `dist/index.html` is published by CI to the `roles-wei` Pages project. Pull requests receive a branch preview; pushes to `main` update `roles.caza.la`. The workflow adds anti-framing, MIME-sniffing and referrer headers, and `scripts/pages.mjs` adds link-preview tags (description, Open Graph, `summary_large_image`) and their image, `pages/og.jpg`, to the web copy only: a preview image needs an absolute https URL, so the onchain page stays exactly `dist/index.html`. Repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` authorize Pages, while `ALCHEMY_API_KEY` gives fork tests an archive RPC.
 
 Never put a private key or Cloudflare token in shell history, the repository or the deployer page.
 
