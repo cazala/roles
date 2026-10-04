@@ -14,7 +14,16 @@ import { scan, clearScan } from './scan.js';
 export const hooks = { conditions: conditionView, allowances: allowancesView, body: editBody, create: createView };
 editorHooks.use = useRole;
 editorHooks.conditions = editConditions;
-export const tabbar = (address, active) => h('nav.tabs', ['roles', 'allowances'].map(name => h('a' + (name === active ? '.on' : ''), { href: '#/' + address + (name === 'roles' ? '' : '/' + name) }, name[0].toUpperCase() + name.slice(1))));
+// One row of tabs for a modifier: Roles · Members · Allowances, their counts (set by the page once it has the state)
+// and, on the right, the open tab's action (+ New role, + Add member, + New allowance).
+export const tabbar = (address, active) => {
+  const names = ['roles', 'members', 'allowances'], slot = h('span.tact');
+  const links = names.map((name) => h('a' + (name === active ? '.on' : ''), { href: '#/' + address + (name === 'roles' ? '' : '/' + name), 'data-tab': name }, name[0].toUpperCase() + name.slice(1)));
+  const el = h('nav.tabs.mtabs', links, h('span.grow'), slot);
+  el.counts = (c) => links.forEach((a, i) => c[names[i]] != null && put(a, names[i][0].toUpperCase() + names[i].slice(1) + ' · ' + c[names[i]]));
+  el.action = (node) => put(slot, node);
+  return el;
+};
 const options = n => ['CALL, no ETH', 'CALL with ETH', 'CALL or DELEGATECALL, no ETH', 'CALL or DELEGATECALL with ETH'][n];
 export { roleView } from './role-view.js';
 export function body(ctx, path) {
@@ -55,7 +64,9 @@ export async function renderAddress(address, path, epoch) {
   const ownerSupported=meta.owner===session.account||ownerSafe;
   const root = h('div', h('h1', 'Roles ' + info.version), addr(address), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), !ownerSupported&&warn('This owner is neither the connected wallet nor a readable Safe. You can inspect permissions and prepare calls, but roles.wei cannot submit them for this owner.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
   if (!info.supported) { root.append(h('p.mut', 'This implementation is identified but is not supported for permission decoding or editing.'), h('details', h('summary', 'Implementation'), addr(info.implementation), h('pre', info.code))); return root; }
-  root.append(tabbar(address, path[0] === 'allowances' ? 'allowances' : 'roles'));
+  // The tabs sit right above what they switch: the history status, a link's proposal and the pending changes
+  // concern the whole modifier and come first (`top`, which the editor fills).
+  const tabs = tabbar(address, ['allowances', 'members'].includes(path[0]) ? path[0] : 'roles'), top = h('div.mtop');
   // One status under the actions: progress while scanning, the result when done, or what went wrong.
   // The history as a sync indicator: status first, one action for the current state, the rare options under ⋯.
   const content = h('div'), icn = h('span.sicon'), text = h('div.stext'), action = h('div.sact'), fill = h('span'), hint = h('div.shint');
@@ -102,7 +113,7 @@ export async function renderAddress(address, path, epoch) {
       const state = replay(result.logs);
       if (result.caughtUp && result.hash !== snapshot.hash) throw Error('Snapshot changed during scan. Refresh the page.');
       if (result.complete && ['owner', 'avatar', 'target'].some(k => state[k] !== meta[k])) throw Error('History does not match current contract metadata. Clear the cached history and scan again before editing.');
-      const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, ownerSafe, refresh };
+      const ctx = { address, chain, info, meta, state, request, snapshot, complete: result.complete, ownerSafe, refresh, top, tabs };
       const span = ' · blocks ' + num(result.start) + ' – ' + num(result.last) + (provider.source ? ' · read through ' + provider.source : '');
       const kind = result.complete ? 'done' : 'partial', words = (result.complete ? 'Complete history' : 'Partial history, from a start block you chose · editing disabled') + span;
       show(kind, words, button('Refresh', refresh));
@@ -128,10 +139,10 @@ export async function renderAddress(address, path, epoch) {
     h('hr'), h('button.sclear', { onclick: restart }, 'Clear cached history and scan again'));
   const closeMenu = (e) => (bar.isConnected ? !bar.querySelector('.smore').contains(e.target) && (menu.hidden = true) : removeEventListener('pointerdown', closeMenu));
   addEventListener('pointerdown', closeMenu); // a tap anywhere else closes the menu
-  root.append(bar, content);
+  root.append(bar, top, tabs, content);
   if (hit) {
     show(hit.kind, hit.words + ' · read ' + ago(hit.at), button('Refresh', refresh));
-    put(content, body({ address, chain, info, meta, state: hit.state, request, snapshot, complete: hit.complete, ownerSafe, refresh }, path));
+    put(content, body({ address, chain, info, meta, state: hit.state, request, snapshot, complete: hit.complete, ownerSafe, refresh, top, tabs }, path));
   } else run();
   return root;
 }

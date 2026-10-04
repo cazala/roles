@@ -9,6 +9,7 @@ roles.wei is a single page; everything after `#` is the route. For agents, [skil
 | `#/` | Home: saved Safes and Roles modifiers, search or open an address |
 | `#/<address>` | A Safe (its Roles modifiers, Create a Roles modifier) or a Roles modifier (its roles); an address or a `.eth` / `.wei` name |
 | `#/<modifier>/role/<roleKey>` | A role: its permissions (targets, functions, conditions) and members. `roleKey` is the bytes32 key |
+| `#/<modifier>/members` | The modifier's members, a row per member with its roles |
 | `#/<modifier>/allowances` | The modifier's allowances |
 
 ## Parameters
