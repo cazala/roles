@@ -350,6 +350,15 @@ a.hint:hover { text-decoration: underline; }
 .stext { flex: 1; min-width: 0; font-size: 14px; color: var(--fg); overflow-wrap: anywhere; }
 .sact button { padding: 4px 12px; font-size: 13px; }
 .smore { position: relative; }
+/* The action and ⋯ as one split button: "Refresh | ⋯". */
+.sctl { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
+.sctl .sact { display: flex; }
+.sctl .sact button { border: 0; border-radius: 5px 0 0 5px; background: none; }
+.sctl .sact button:hover { background: var(--bg); }
+.sctl .smore { display: flex; }
+.sctl .sact:not(:empty) + .smore { border-left: 1px solid var(--line); }
+.sctl .smore > button.ib { width: 30px; height: auto; min-height: 28px; border-radius: 0 5px 5px 0; }
+.sctl .sact:empty + .smore > button.ib { border-radius: 5px; }
 .smore .dropdown { right: 0; min-width: 280px; gap: 6px; padding: 12px; }
 .smore .dropdown label { margin: 0; color: var(--mut); font-size: 13px; }
 .smore .dropdown p { margin: 0; }
@@ -369,7 +378,7 @@ a.hint:hover { text-decoration: underline; }
 @keyframes spin { to { transform: rotate(360deg); } }
 /* Once complete, it recedes: no card, muted, a check. */
 .sync.done, .sync.partial { border-color: transparent; background: none; }
-.sync.done .sline, .sync.partial .sline { padding-left: 0; min-height: 36px; }
+.sync.done .sline, .sync.partial .sline { margin: 0 -1px; padding-left: 0; padding-right: 0; min-height: 36px; }
 .sync.done .stext, .sync.partial .stext { color: var(--mut); font-size: 13px; }
 .sync.done .sicon { color: var(--ok); }
 .sync.error { border-color: #c98a00; background: var(--warnbg); }

@@ -74,7 +74,7 @@ export async function renderAddress(address, path, epoch) {
   // The history as a sync indicator: status first, one action for the current state, the rare options under ⋯.
   const content = h('div'), icn = h('span.sicon'), text = h('div.stext'), action = h('div.sact'), fill = h('span'), hint = h('div.shint');
   const menu = h('div.dropdown', { hidden: true }), more = h('button.ib', { title: 'History options', 'aria-label': 'History options', onclick: () => (menu.hidden = !menu.hidden) }, icon('M5 12h.01', 'M12 12h.01', 'M19 12h.01'));
-  const bar = h('div.sync', h('div.sline', icn, text, action, h('div.smore', more, menu)), h('div.meter', fill), hint);
+  const bar = h('div.sync', h('div.sline', icn, text, h('div.sctl', action, h('div.smore', more, menu))), h('div.meter', fill), hint);
   const num = (n) => Number(n).toLocaleString('en-US');
   const button = (label, fn) => h('button', { onclick: fn }, label);
   /** One state: kind (busy / done / paused / error / partial), text, action, progress 0–100 or null, hint. */
