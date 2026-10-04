@@ -83,3 +83,25 @@ test('a reorged tip keeps the older events and rescans only the recent blocks', 
   assert.equal(again.complete, true);
   assert.equal(f.calls[0][0], 3000 - REORG_DEPTH + 1, 'resumes right after the kept blocks, not from the deployment');
 });
+
+test('with an indexer, an event indexed late in the recent blocks is still found by the next scan', async () => {
+  const memory = new Map(); globalThis.localStorage = { getItem: k => memory.get(k), setItem: (k, v) => memory.set(k, v) };
+  const at = (n, topic = '0x' + 'ab'.repeat(32)) => ({ address, topics: [topic], data: '0x', blockNumber: '0x' + n.toString(16), blockHash: 'h' + n, transactionHash: 't' + n, logIndex: '0x0' });
+  const setupLog = { ...at(10, SETUP_TOPIC), topics: [SETUP_TOPIC, ...['34', '56', '78'].map(b => '0x' + '00'.repeat(12) + b.repeat(20))], data: '0x' + '00'.repeat(12) + '9a'.repeat(20) };
+  const indexed = [setupLog];
+  const request = async (method, params) => {
+    if (method === 'eth_getBlockByNumber') return { hash: 'hash' + params[0] };
+    if (method === 'eth_getLogs') {
+      const a = Number(BigInt(params[0].fromBlock)), b = Number(BigInt(params[0].toBlock)), t = params[0].topics?.[0];
+      return indexed.filter((l) => Number(BigInt(l.blockNumber)) >= a && Number(BigInt(l.blockNumber)) <= b && (!t || l.topics[0] === t));
+    }
+    throw Error(method);
+  };
+  request.wide = true;
+  const first = await scan(request, { address, chain: 1, block: 300 });
+  assert.equal(first.complete, true); assert.equal(first.logs.length, 1);
+  indexed.push(at(295)); // the indexer catches up on block 295 after the first scan
+  const next = await scan(request, { address, chain: 1, block: 300 });
+  assert.deepEqual(next.logs.map((l) => Number(BigInt(l.blockNumber))), [10, 295]);
+  assert.equal(next.complete, true);
+});

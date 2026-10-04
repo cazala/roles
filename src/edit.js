@@ -19,6 +19,8 @@ export const editorHooks = {};
 const id = ctx => ctx.chain + ':' + ctx.address;
 export function draft(ctx) {
   let d = drafts.get(id(ctx));
+  // The chain moved on (a refresh, your change applied): with nothing pending, start again from what it says now.
+  if (d && ctx.snapshot && d.block < Number(BigInt(ctx.snapshot.number)) && !diff(d.base, d.value, ctx.address).length) d = null;
   if (!d) { d={ base:structuredClone(ctx.state), value:structuredClone(ctx.state), block:Number(BigInt(ctx.snapshot.number)), history:[] }; drafts.set(id(ctx),d); }
   return d;
 }
