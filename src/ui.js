@@ -146,7 +146,7 @@ const relabel = (a) =>
   });
 addEventListener('labels', (e) => relabel(e.detail));
 
-function tagButton(a) {
+export function tagButton(a) {
   const b = h('button.copy.tag', { title: labels.get(a) ? 'Edit label' : 'Add a label', 'aria-label': 'Label this address' });
   b.append(icon(...ICONS.tag));
   b.onclick = (e) => (e.preventDefault(), e.stopPropagation(), labelDialog(a));
