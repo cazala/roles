@@ -6,6 +6,7 @@ import { h, put, addr, warn, copy, menu, sheet, toClipboard, copyButton, tagButt
 import { parseAbi } from './abicoder.js';
 import { toTree, TYPES } from './conditions.js';
 import { keyName, json } from './roles.js';
+import { tabCounts } from './allowances.js';
 import { explorerFor, explorerSource } from './reads.js';
 import { load, store } from './store.js';
 import * as labels from './labels.js';
@@ -202,31 +203,26 @@ function targetView(t, ctx, key) {
   return card;
 }
 
-/** The role page: header, then Permissions and Members. */
-let shown = { key: null, tab: 'permissions' }; // the open tab survives redraws of the same role
+/**
+ * The role page: its name and key, its members on one line (each with its actions, + Add member), then its
+ * permissions, one card per target (+ Add target). The modifier's tabs above keep their counts here too.
+ */
 export function roleView(ctx, key) {
   const role = ctx.state.roles[key], ed = ctx.edit, base = ctx.base?.roles[key];
   if (!role) return h('p.mut', 'No role with this key was found in the scanned history.');
-  if (shown.key !== key) shown = { key, tab: 'permissions' };
+  if (ctx.tabs) ctx.tabs.counts(tabCounts(ctx.state));
   const members = Object.entries(role.members).filter(([, yes]) => yes).map(([a]) => a), targets = Object.values(role.targets).filter((t) => t.clearance);
   // In the editor, also what the draft removed, so it can be restored.
   const goneMembers = ed && base ? Object.entries(base.members).filter(([a, yes]) => yes && !role.members[a]).map(([a]) => a) : [];
   const shownTargets = Object.values(role.targets).filter((t) => t.clearance || (ed && base?.targets[t.address]?.clearance)); // in place, revoked ones too
-  const content = h('div'), tabs = h('nav.tabs.rtabs');
-  const memberRow = (a, gone) => {
+  const member = (a, gone) => {
     const isNew = ed && !gone && !base?.members[a];
     const def = ctx.state.defaults[a] === key;
-    return h('div.srow' + (gone || isNew ? '.pend' : '') + (gone ? '.gone' : ''), named(ctx.chain, a), !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'), def && h('span.chip', 'Default role'), isNew && h('span.chip.draft', 'New'), gone && h('span.chip.draft', 'Removed in draft'), h('span.grow'),
+    return h('span.rmem' + (gone || isNew ? '.pend' : '') + (gone ? '.gone' : ''), named(ctx.chain, a), !ctx.state.enabled[a] && h('span.chip.warn', 'Disabled'), def && h('span.chip', 'Default role'), isNew && h('span.chip.draft', 'New'), gone && h('span.chip.draft', 'Removed in draft'),
       ed && (gone ? h('button.link', { onclick: () => ed.restoreMember(a) }, 'Restore') : menu(() => [!def && ['Make this their default role', () => ed.makeDefault(a)], ['Copy address', () => toClipboard(a).catch(() => {})], ['Remove member', () => ed.removeMember(a), true]], 'Member actions')));
   };
-  const show = (which) => {
-    shown.tab = which;
-    put(tabs, [['permissions', 'Permissions · ' + targets.length], ['members', 'Members · ' + members.length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)), h('span.grow'),
-      ed && (which === 'members' ? h('button.sm', { onclick: ed.addMember }, '+ Add member') : h('button.sm', { onclick: ed.addTarget }, '+ Add target')));
-    put(content, which === 'members'
-      ? members.length || goneMembers.length ? h('div.slist', members.map((a) => memberRow(a, false)), goneMembers.map((a) => memberRow(a, true))) : h('p.empty', 'No members assigned.')
-      : shownTargets.length ? shownTargets.map((t) => targetView(t, ctx, key)) : h('p.empty', 'No targets configured for this role.'));
-  };
-  show(shown.tab);
-  return h('div.role', h('div.rhead', h('h2', keyName(key)), h('span.grow'), ctx.roleActions), h('p.mut.rkey', h('code', key), copy(key, 'Copy role key')), tabs, content);
+  const who = h('div.rmembers', h('span.mut.rlabel', 'Members'), members.length || goneMembers.length ? [members.map((a) => member(a, false)), goneMembers.map((a) => member(a, true))] : h('span.mut', 'None'), ed && h('button.link.radd', { onclick: ed.addMember }, '+ Add member'));
+  const perms = h('div.rsec', h('h3', 'Permissions · ' + targets.length), h('span.grow'), ed && h('button.sm', { onclick: ed.addTarget }, '+ Add target'));
+  return h('div.role', h('div.rhead', h('h2', keyName(key)), h('span.grow'), ctx.roleActions), h('p.mut.rkey', h('code', key), copy(key, 'Copy role key')), who, perms,
+    shownTargets.length ? shownTargets.map((t) => targetView(t, ctx, key)) : h('p.empty', 'No targets configured for this role.'));
 }

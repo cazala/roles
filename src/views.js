@@ -57,9 +57,11 @@ export async function renderAddress(address, path, epoch) {
       const card = h(item.version ? 'div.smod.open' : 'div.smod', h('div.srow', item.version ? h('a.name', { href: '#/' + m }, 'Roles ' + item.version) : h('b', 'Other module'), addr(m)), item.faulty && warn('This Roles version is faulty. Do not grant new permissions.'), meta && h('div.modulemeta', h('p', 'Owner ', addr(meta.owner)), meta.owner !== address && warn('This owner can change every permission and control the Safe’s assets.'), (meta.avatar !== address || meta.target !== address) && warn('Avatar or target differs from this Safe.'), h('p', 'Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target))));
       // The whole card opens the modifier; its own links and buttons (copy, label, explorer) keep their action.
       if (item.version) card.addEventListener('click', (e) => { if (!e.target.closest('a, button') && !String(getSelection())) location.hash = '#/' + m; });
-      return card;
+      return Object.assign(card, { working: !!item.version && !item.faulty });
     }));
-    return h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), hooks.create && hooks.create({ address, safe, request, snapshot, chain, start: /[?&]create\b/.test(location.hash) }), modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'));
+    // A Safe with a working Roles modifier needs no Create card: another one is a quiet link under the list.
+    const create = hooks.create ? hooks.create({ address, safe, request, snapshot, chain, start: /[?&]create\b/.test(location.hash), has: modules.some((c) => c.working) }) : {};
+    return h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), create.top, modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'), create.foot);
   }
   const meta = hit ? hit.meta : await metadata(request, address, snapshot.number);
   let ownerSafe = hit ? hit.ownerSafe : false;

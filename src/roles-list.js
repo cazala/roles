@@ -4,7 +4,7 @@ import { h, put, short, menu, toClipboard } from './ui.js';
 import { keyName } from './roles.js';
 import { named, namesFor } from './role-view.js';
 import * as labels from './labels.js';
-import { token } from './allowances.js';
+import { token, tabCounts } from './allowances.js';
 
 let view = 'roles'; // the open tab survives redraws
 const SEARCH_FROM = 6;
@@ -62,7 +62,7 @@ export function rolesPage(ctx) {
   const show = (which) => {
     view = which;
     // The modifier's tab row (Roles · Members · Allowances) shows the counts and the action; without it, a local one.
-    if (ctx.tabs) ctx.tabs.counts({ roles: roles.length, members: Object.keys(who).length, allowances: Object.keys(ctx.state.allowances).length }), ctx.tabs.action(action(which));
+    if (ctx.tabs) ctx.tabs.counts(tabCounts(ctx.state)), ctx.tabs.action(action(which));
     else put(tabs, [['roles', 'Roles · ' + roles.length], ['members', 'Members · ' + Object.keys(who).length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)), h('span.grow'), action(which));
     draw();
   };
