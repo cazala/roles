@@ -110,6 +110,7 @@ export function explorer(e, chain, q) {
   return next;
 }
 const hx = (v) => (!v || v === '0x' ? '0x0' : v); // Etherscan writes zero as "0x"
+const bytes = (v) => (!v ? '0x' : String(v).startsWith('0x') ? v : '0x' + v); // Routescan writes empty data as ""
 /**
  * eth_getLogs from a block explorer's index (`e`, from explorerFor): the whole range in pages of 1,000, as RPC
  * logs. The explorer is trusted to return every log; the reader checks each one against the chain.
@@ -125,7 +126,7 @@ export async function explorerLogs(e, chain, { address, topics, fromBlock, toBlo
     if (r.status !== '1' && !/no (records|logs)/i.test(r.message || '')) throw Error(e.name + ': ' + (typeof r.result === 'string' ? r.result : r.message || 'request failed') + '. Check the block explorer in Settings.');
     const list = Array.isArray(r.result) ? r.result : [];
     for (const l of list) {
-      const log = { address: l.address.toLowerCase(), topics: l.topics.filter(Boolean), data: l.data, blockNumber: hx(l.blockNumber), blockHash: l.blockHash, transactionHash: l.transactionHash, transactionIndex: hx(l.transactionIndex), logIndex: hx(l.logIndex), removed: false };
+      const log = { address: l.address.toLowerCase(), topics: l.topics.filter(Boolean), data: bytes(l.data), blockNumber: hx(l.blockNumber), blockHash: l.blockHash, transactionHash: l.transactionHash, transactionIndex: hx(l.transactionIndex), logIndex: hx(l.logIndex), removed: false };
       const k = log.transactionHash + ':' + Number(log.logIndex);
       if (!seen.has(k)) seen.add(k), out.push(log);
     }

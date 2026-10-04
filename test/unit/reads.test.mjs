@@ -73,6 +73,8 @@ test('explorer logs come back as RPC logs, in order, across pages', async () => 
   const got = await explorerLogs(etherscan, 1, { address, fromBlock: '0x0', toBlock: '0x1388' });
   assert.equal(got.length, 1500);
   assert.equal(got[0].logIndex, '0x0', 'zero is normalized');
+  explorer = [{ ...elog(5, 0), data: '' }];
+  assert.equal((await explorerLogs(etherscan, 1, { address, fromBlock: '0x0', toBlock: '0x10' }))[0].data, '0x', 'empty data (Routescan writes "") is 0x');
   await assert.rejects(explorerLogs({ ...etherscan, key: 'bad'.repeat(10) }, 1, { address, fromBlock: '0x0', toBlock: '0x1' }), /Invalid API Key/);
 });
 const setupLogs = () => {
