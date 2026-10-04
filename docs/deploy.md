@@ -49,7 +49,7 @@ npm run deployer -- --anvil http://127.0.0.1:18600
 
 ## WalletConnect project ID
 
-The project ID (`config/walletconnect.json`) and the links to other places (`config/links.json`: `safe`, safe.wei's gateways, where Safe transactions are handed off and the footer links, the one on the same gateway family as the page being used; `source`, the source code) are built into their own tiny first chunk, cut at the `<!--config-->` marker, as in safe.wei. Replacing either changes only that chunk and the app contract; the other chunks keep their addresses, provided the rest is built from the deployed `src/` (tag the deployed commit). The steps are safe.wei's: `docs/deploy.md` → Replacing the WalletConnect project ID. The project must allow `roles.caza.la`, `*.roles-wei.pages.dev` and the gateway domains.
+The project ID (`config/walletconnect.json`) and the links to other places (`config/links.json`: `safe`, safe.wei's gateways, where Safe transactions are handed off and the footer links, the one on the same gateway family as the page being used; `source`, the source code) and the block explorers (`config/explorers.json`: the providers, the chains each covers and the default order; keep it the same as safe.wei's) are built into their own tiny first chunk, cut at the `<!--config-->` marker, as in safe.wei. Replacing any of them changes only that chunk and the app contract; the other chunks keep their addresses, provided the rest is built from the deployed `src/` (tag the deployed commit). The steps are safe.wei's: `docs/deploy.md` → Replacing the WalletConnect project ID. The project must allow `roles.caza.la`, `*.roles-wei.pages.dev` and the gateway domains.
 
 ## Vanity address
 

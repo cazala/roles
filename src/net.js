@@ -1,7 +1,7 @@
 // Every network request roles.wei makes outside the wallet goes through here, and the build allows only
 // these two: WalletConnect's relay (a wallet connected by QR code), and JSON-RPC for reads the connected
-// wallet cannot serve (a phone wallet; a wallet RPC without old logs), plus the block explorer API when the user
-// gave a key for it. Nothing else leaves the page.
+// wallet cannot serve (a phone wallet; a wallet RPC without old logs), plus the block explorer API (config/explorers.json,
+// or yours in Settings; None turns it off). Nothing else leaves the page.
 export const socket = (url) => new WebSocket(url);
 
 /** GET or POST JSON over HTTPS (the one fetch in the page). */
@@ -21,6 +21,8 @@ async function json(url, body, what = 'The RPC') {
   // Many RPCs answer an HTTP error with a JSON-RPC error inside (e.g. a log range too wide): keep its message.
   const j = await res.json().catch(() => null);
   if (j && j.error) return j;
+  // A block explorer answers a rate limit (HTTP 429) with its usual JSON: keep it, so its message is read.
+  if (j && j.status !== undefined && j.message) return j;
   throw Error(what + ' answered ' + res.status + (res.status === 429 ? ' (too many requests): try again in a moment.' : '.'));
 }
 /** A GET returning JSON (the block explorer API). */

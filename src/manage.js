@@ -46,7 +46,7 @@ export function backupDialog(incoming, done) {
     const next = async () => { try { preview(await backup.parse(ta.value)); } catch (e) { put(inErr, bad(/JSON|Unexpected/.test(e.message) ? 'That does not look like a backup.' : e.message)); } };
     setTitle('Backup & sync');
     put(d,
-      h('p.mut.small.lead', 'Move your saved addresses, labels and contract ABIs to another device. Nothing is uploaded: it all travels in the link or JSON. Your RPC endpoints and Etherscan key are not included.'),
+      h('p.mut.small.lead', 'Move your saved addresses, labels and contract ABIs to another device. Nothing is uploaded: it all travels in the link or JSON. Your RPC endpoints and block explorer keys are not included.'),
       h('div.bsec', h('b', 'Export'), h('div.mut.small', words(backup.counts(data)))),
       h('div.actions', btn('Copy link', async () => toClipboard(await backup.link(data)), '.primary'), btn('Copy JSON', async () => toClipboard(JSON.stringify(data, null, 2)))),
       h('p.mut.small', 'Open the link on your other device, or import the JSON there.'), out,

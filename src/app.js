@@ -5,7 +5,7 @@ import { use, rpc } from './rpc.js';
 import { add, discover, list, remembered, remember } from './wallets.js';
 import { connector, provider as wcProvider } from './wc.js';
 import { qr, qrPath } from './qr.js';
-import { addRpc, explorerKey, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } from './reads.js';
+import { addRpc, explorerChoice, explorerDefaults, explorerProviders, reader, removeRpc, rpcs, setExplorer, WC_RPC } from './reads.js';
 import { nameOf, resolveName } from './names.js';
 import { load, store } from './store.js';
 import { labelsSheet, backupDialog } from './manage.js';
@@ -14,7 +14,7 @@ import * as labels from './labels.js';
 
 export const session = { provider: null, account: null, chain: null, epoch: 0 };
 const main = $('main');
-const network = n => ({ 1: 'Ethereum', 100: 'Gnosis', 137: 'Polygon', 10: 'Optimism', 8453: 'Base', 42161: 'Arbitrum' }[n] || 'Chain ' + n);
+const network = n => ({ 1: 'Ethereum', 100: 'Gnosis', 137: 'Polygon', 10: 'Optimism', 8453: 'Base', 42161: 'Arbitrum', 56: 'BNB Chain', 43114: 'Avalanche', 59144: 'Linea', 534352: 'Scroll', 11155111: 'Sepolia' }[n] || 'Chain ' + n);
 
 // ---- WalletConnect: an owner's wallet elsewhere (e.g. on a phone), connected by QR code ----
 // roles.wei is the dapp: it shows a QR code, the wallet approves, and signing requests go to it. A phone wallet
@@ -68,7 +68,7 @@ async function connected(wallet) {
   const accounts = await provider.request({ method: 'eth_requestAccounts' });
   if (!accounts?.[0]) throw Error('No account was connected.');
   if (session.provider?.removeListener) for (const event of ['accountsChanged', 'chainChanged']) session.provider.removeListener(event, changed);
-  // The wallet signs; reads go through the reader (Settings: your RPCs, Etherscan; fallbacks).
+  // The wallet signs; reads go through the reader (Settings: your RPCs, the block explorer; fallbacks).
   session.provider = reader(provider, { chain: () => session.chain, projectId: WC_ID }); use(session.provider);
   session.account = accounts[0].toLowerCase();
   session.chain = Number(await rpc('eth_chainId')); session.epoch++;
@@ -152,7 +152,7 @@ function switchView(id, title, text, extra, auto = true) {
   return gateCard(title, text, h('div.actions.gatebtns', b), out, extra);
 }
 
-/** Settings: RPC endpoints (reads go there instead of the wallet, per chain) and an Etherscan API key. */
+/** Settings: RPC endpoints (reads go there instead of the wallet, per chain) and the block explorer. */
 export function settingsDialog() {
   const { body } = sheet('gear', 'Settings');
   const out = h('div'), list = h('div'), host = (u) => { try { return new URL(u).host; } catch { return u; } };
@@ -162,8 +162,32 @@ export function settingsDialog() {
   };
   const url = h('input', { placeholder: 'Endpoint URL (Alchemy, Infura, your node)', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'RPC URL' }), add = h('button', 'Add');
   add.onclick = act(add, async () => { const c = await addRpc(url.value); url.value = ''; draw(); put(out, h('p.ok', 'Added for ' + network(c) + '.')); (forget(), route()); }, out);
-  const key = h('input', { value: explorerKey(), placeholder: 'Etherscan API key', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Etherscan API key' }), saveKey = h('button', 'Save');
-  saveKey.onclick = act(saveKey, async () => { setExplorerKey(key.value); put(out, h('p.ok', key.value.trim() ? 'Etherscan key saved.' : 'Etherscan key removed.')); (forget(), route()); }, out);
+  // Block explorer: history in a few requests instead of block by block, and contract names. The choices come from
+  // the config chunk (config/explorers.json); Default follows it, so a later config change reaches you.
+  const ch = explorerChoice(), provs = explorerProviders(), byId = (id) => provs.find((p) => p.id === id);
+  const defs = explorerDefaults().map((id) => byId(id).name);
+  const xpick = h('select', { 'aria-label': 'Block explorer' }, h('option', { value: 'default' }, defs.length ? 'Default (' + defs.join(', ') + ')' : 'Default (none)'), h('option', { value: 'none' }, 'None'), provs.map((p) => h('option', { value: p.id }, p.name)), h('option', { value: 'custom' }, 'Custom…'));
+  const xurl = h('input', { value: ch.url, placeholder: 'https://explorer.example/api?chainid={chain}', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Block explorer API URL' });
+  const xkey = h('input', { spellcheck: 'false', autocomplete: 'off' }), keyName = h('b'), keyNote = h('span.mut.small'), keyBox = h('div.xkey', h('div.bsec', keyName, keyNote), xkey);
+  const covers = h('p.mut.small'), xsave = h('button', 'Save'), xout = h('div');
+  // Which chains load through the explorer: the ones it covers, by name; the rest read block by block through the RPC.
+  const chainsOf = (p) => (p ? [...Object.keys(p.urls || {}), ...(p.chains || [])].map(Number) : []);
+  const shape = () => {
+    const id = xpick.value, p = byId(id), named = p ? p.name + ' API key' : 'Block explorer API key';
+    xurl.hidden = id !== 'custom';
+    keyBox.hidden = id === 'default' || id === 'none';
+    put(keyName, named);
+    put(keyNote, p && p.key === 'required' ? ' · required' : ' · optional');
+    xkey.value = ch.keys[id] || '';
+    xkey.placeholder = p && p.keyUrl ? 'Get one at ' + p.keyUrl.replace(/^https:\/\/(www\.)?/, '') : named;
+    xkey.setAttribute('aria-label', named);
+    const ids = id === 'default' ? [...new Set(explorerDefaults().flatMap((d) => chainsOf(byId(d))))] : chainsOf(p);
+    put(covers, p && p.note ? p.note : id === 'none' ? 'History reads every block through your RPC.' : id === 'custom' ? 'Used on every chain; {chain} becomes the chain ID.' : ids.length ? 'Covers ' + ids.sort((a, b) => a - b).map(network).join(', ') + '. Other chains read block by block through your RPC.' : '');
+  };
+  xpick.value = byId(ch.id) || ['default', 'none', 'custom'].includes(ch.id) ? ch.id : 'default';
+  xpick.onchange = () => (shape(), put(xout), xpick.value === 'custom' ? xurl.focus() : !keyBox.hidden && xkey.focus());
+  shape();
+  xsave.onclick = act(xsave, async () => { setExplorer({ id: xpick.value, url: xurl.value, key: xkey.value }); Object.assign(ch, explorerChoice()); put(xout, h('p.ok', 'Saved.')); (forget(), route()); }, xout);
   // safe.wei's gateway, where Safe transactions are handed off and the footer links: one of the built-in ones
   // (config/links.json) or your own. The default follows this page's gateway, else the first; only a choice is saved.
   const gws = LINK.safe || [], cur = savedGateway(), gwOut = h('div');
@@ -183,9 +207,9 @@ export function settingsDialog() {
     h('p.mut.small', 'Reads on an endpoint’s chain go there instead of your wallet’s RPC. Your wallet still signs.'),
     list,
     h('div.row', url, add),
-    h('div.bsec', h('b', 'Etherscan API key'), h('span.mut.small', ' · optional, faster history')),
-    h('p.mut.small', 'History loads from Etherscan in a few requests. Each event is checked against the chain, but Etherscan must return them all.'),
-    h('div.row', key, saveKey),
+    h('div.bsec', h('b', 'Block explorer')),
+    h('p.mut.small', 'Speeds up history and shows contract names. Each result is checked against the chain; a missing one can’t be detected, so pick an explorer you trust.'),
+    h('div.xpick', xpick, xurl, keyBox), covers, h('div.actions', xsave), xout,
     h('p.mut.small', 'All kept in this browser.'),
     out,
   );

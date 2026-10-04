@@ -1,23 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addRpc, explorerLogs, noHistory, reader, removeRpc, rpcs, setExplorerKey, WC_RPC } from '../../src/reads.js';
+import { addRpc, explorerFor, explorerLogs, explorerRefused, explorerSource, noHistory, reader, removeRpc, rpcs, setExplorer, WC_RPC } from '../../src/reads.js';
+import { readFileSync } from 'node:fs';
 import { scan } from '../../src/scan.js';
 import { SETUP_TOPIC } from '../../src/roles.js';
 
 const memory = new Map();
 globalThis.localStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };
 const address = '0x' + '20'.repeat(20), KEY = 'K'.repeat(34);
+// The block explorers as the config chunk sets them (config/explorers.json); set per test, off otherwise.
+const EXPLORERS = JSON.parse(readFileSync(new URL('../../config/explorers.json', import.meta.url), 'utf8'));
 // The network as fetch sees it: JSON-RPC endpoints (POST) and Etherscan (GET).
 const served = [];
-let explorer = [];
+let explorer = [], refusing = '';
 globalThis.fetch = async (url, init = {}) => {
   if (!init.body) {
     const q = new URL(url).searchParams;
-    served.push(['etherscan', q.get('module')]);
-    if (q.get('apikey') !== KEY) return { ok: true, json: async () => ({ status: '0', message: 'NOTOK', result: 'Invalid API Key' }) };
+    const keyless = !url.includes('etherscan');
+    served.push([keyless ? new URL(url).hostname : 'etherscan', q.get('module')]);
+    if (refusing) return { ok: true, json: async () => ({ status: '0', message: 'NOTOK', result: refusing }) };
+    if (!keyless && q.get('apikey') !== KEY) return { ok: true, json: async () => ({ status: '0', message: 'NOTOK', result: 'Invalid API Key' }) };
     const from = Number(q.get('fromBlock')), to = Number(q.get('toBlock')), page = Number(q.get('page')), n = Number(q.get('offset'));
     const hit = explorer.filter((l) => Number(l.blockNumber) >= from && Number(l.blockNumber) <= to && (!q.get('topic0') || l.topics[0] === q.get('topic0'))).slice((page - 1) * n, page * n);
-    return { ok: true, json: async () => (hit.length ? { status: '1', message: 'OK', result: hit } : { status: '0', message: 'No records found', result: [] }) };
+    // Blockscout gives no block hash.
+    const out = keyless ? hit.map(({ blockHash, ...l }) => l) : hit;
+    return { ok: true, json: async () => (out.length ? { status: '1', message: 'OK', result: out } : { status: '0', message: 'No records found', result: [] }) };
   }
   const { id, method, params } = JSON.parse(init.body);
   served.push([url, method]);
@@ -60,29 +67,85 @@ test('a wallet RPC without old history: history continues through WalletConnect�
 });
 
 const elog = (block, i, topic = '0x' + 'ab'.repeat(32)) => ({ address, topics: [topic], data: '0x', blockNumber: '0x' + block.toString(16), blockHash: '0xh' + block, timeStamp: '0x1', gasPrice: '0x1', gasUsed: '0x1', logIndex: i ? '0x' + i.toString(16) : '0x', transactionHash: '0xt' + block, transactionIndex: '0x' });
-test('Etherscan logs come back as RPC logs, in order, across pages', async () => {
+const etherscan = { id: 'etherscan', name: 'Etherscan', url: 'https://api.etherscan.io/v2/api?chainid=1', key: KEY };
+test('explorer logs come back as RPC logs, in order, across pages', async () => {
   explorer = Array.from({ length: 1500 }, (_, i) => elog(100 + i, i % 3));
-  const got = await explorerLogs(KEY, 1, { address, fromBlock: '0x0', toBlock: '0x1388' });
+  const got = await explorerLogs(etherscan, 1, { address, fromBlock: '0x0', toBlock: '0x1388' });
   assert.equal(got.length, 1500);
   assert.equal(got[0].logIndex, '0x0', 'zero is normalized');
-  await assert.rejects(explorerLogs('bad'.repeat(10), 1, { address, fromBlock: '0x0', toBlock: '0x1' }), /Invalid API Key/);
+  await assert.rejects(explorerLogs({ ...etherscan, key: 'bad'.repeat(10) }, 1, { address, fromBlock: '0x0', toBlock: '0x1' }), /Invalid API Key/);
 });
-test('with an Etherscan key, the scan takes the whole history in a few requests and checks each block', async () => {
-  reset(); setExplorerKey(KEY);
+const setupLogs = () => {
   explorer = [elog(40, 0, SETUP_TOPIC), elog(70, 1)];
   explorer[0].topics = [SETUP_TOPIC, ...['34', '56', '78'].map((b) => '0x' + '00'.repeat(12) + b.repeat(20))];
   explorer[0].data = '0x' + '00'.repeat(12) + '9a'.repeat(20);
+};
+const scanWith = (r) => { const request = (method, params) => r.request({ method, params }); Object.defineProperty(request, 'wide', { get: () => r.wide }); return scan(request, { address, chain: 1, block: 100000 }); };
+test('with Etherscan and a key, the scan takes the whole history in a few requests and checks each block', async () => {
+  reset(); globalThis.EXPLORERS = EXPLORERS; setExplorer({ id: 'etherscan', key: KEY });
+  setupLogs();
   const r = reader(wallet((m) => m === 'eth_getLogs' || m === 'eth_getCode'), { chain: () => 1, projectId: 'p' });
-  const request = (method, params) => r.request({ method, params });
-  Object.defineProperty(request, 'wide', { get: () => r.wide });
-  const res = await scan(request, { address, chain: 1, block: 100000 });
+  const res = await scanWith(r);
   assert.equal(res.start, 40); assert.equal(res.complete, true); assert.equal(res.logs.length, 2);
-  assert.match(r.source, /Etherscan/);
+  assert.equal(r.source, 'Etherscan');
   assert.ok(served.filter(([u]) => u === 'etherscan').length <= 3, 'a few requests, not a block-by-block walk');
   explorer[1].blockHash = '0xforged';
   await assert.rejects(r.request({ method: 'eth_getLogs', params: [{ address, fromBlock: '0x0', toBlock: '0x186a0' }] }), /does not match the chain/);
-  setExplorerKey('');
+  setExplorer({ id: 'none' });
   assert.equal(r.wide, false);
+  delete globalThis.EXPLORERS;
+});
+test('by default Blockscout serves Ethereum; its logs (no block hash) are checked in their receipts', async () => {
+  reset(); globalThis.EXPLORERS = EXPLORERS;
+  assert.equal(explorerFor(1).name, 'Blockscout');
+  assert.equal(explorerFor(43114).name, 'Routescan', 'the next default where Blockscout has no explorer');
+  assert.equal(explorerFor(100), null, 'no default covers Gnosis');
+  setupLogs();
+  let receipts = (t) => ({ blockNumber: explorer.find((l) => l.transactionHash === t).blockNumber, blockHash: explorer.find((l) => l.transactionHash === t).blockHash, logs: explorer.filter((l) => l.transactionHash === t).map((l) => ({ ...l, logIndex: l.logIndex === '0x' ? '0x0' : l.logIndex })) });
+  const w = { request: async ({ method, params }) => method === 'eth_getTransactionReceipt' ? receipts(params[0]) : method === 'eth_getBlockByNumber' ? { hash: '0xh' + Number(params[0]) } : method === 'eth_getCode' ? (() => { throw Error('pruned history unavailable'); })() : 'wallet:' + method };
+  const r = reader(w, { chain: () => 1, projectId: '' });
+  const res = await scanWith(r);
+  assert.equal(res.complete, true); assert.equal(res.logs.length, 2);
+  assert.equal(res.logs[1].blockHash, '0xh70', 'the hash comes from the receipt');
+  assert.equal(r.source, 'Blockscout');
+  receipts = (t) => ({ blockNumber: '0x46', blockHash: '0xh70', logs: [] });
+  await assert.rejects(r.request({ method: 'eth_getLogs', params: [{ address, fromBlock: '0x0', toBlock: '0x186a0' }] }), /does not match the chain/);
+  receipts = () => null;
+  await assert.rejects(r.request({ method: 'eth_getLogs', params: [{ address, fromBlock: '0x0', toBlock: '0x186a0' }] }), /cannot be checked/);
+  delete globalThis.EXPLORERS;
+});
+test('an explorer refusing the chain hands the read to the RPC, for the session, and says so', async () => {
+  reset(); globalThis.EXPLORERS = EXPLORERS; setExplorer({ id: 'etherscan', key: KEY });
+  refusing = 'Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage.';
+  const r = reader({ request: async ({ method }) => (method === 'eth_getLogs' ? ['from the wallet'] : 'wallet:' + method) }, { chain: () => 8453, projectId: 'p' });
+  assert.equal(r.wide, true);
+  assert.deepEqual(await r.request({ method: 'eth_getLogs', params: [{ address, fromBlock: '0x0', toBlock: '0x10' }] }), ['from the wallet']);
+  assert.equal(r.wide, false);
+  assert.deepEqual(explorerRefused(8453), { name: 'Etherscan' });
+  refusing = '';
+  setExplorer({ id: 'none' });
+  delete globalThis.EXPLORERS;
+});
+test('a contract’s name and ABI come from the explorer, a Blockscout proxy’s with its implementation’s', async () => {
+  reset();
+  const impl = '0x' + '77'.repeat(20), saved = globalThis.fetch;
+  const f = (name) => JSON.stringify([{ type: 'function', name, inputs: [], outputs: [], stateMutability: 'view' }]);
+  globalThis.fetch = async (u) => ({ ok: true, json: async () => ({ status: '1', message: 'OK', result: [String(u).includes(impl) ? { ABI: f('balanceOf'), ContractName: 'Impl' } : { ABI: f('admin'), ContractName: 'Proxy', IsProxy: 'true', ImplementationAddress: impl }] }) });
+  const s = await explorerSource({ id: 'blockscout', name: 'Blockscout', url: 'https://eth.blockscout.com/api', key: '' }, 1, address);
+  assert.equal(s.name, 'Proxy');
+  assert.deepEqual(JSON.parse(s.abi).map((x) => x.name), ['admin', 'balanceOf']);
+  globalThis.fetch = saved;
+});
+test('an Etherscan key saved before the choice existed keeps working', () => {
+  reset(); globalThis.EXPLORERS = EXPLORERS;
+  memory.set('roles.wei:explorerkey', JSON.stringify(KEY));
+  assert.equal(explorerFor(1).name, 'Etherscan');
+  assert.throws(() => setExplorer({ id: 'etherscan' }), /needs an API key/);
+  assert.throws(() => setExplorer({ id: 'custom', url: 'http://x.example' }), /https URL/);
+  setExplorer({ id: 'custom', url: 'https://x.example/{chain}/api' });
+  assert.equal(explorerFor(5).url, 'https://x.example/5/api');
+  assert.equal(JSON.parse(memory.get('roles.wei:explorerkey')), '');
+  delete globalThis.EXPLORERS;
 });
 
 test('an RPC error inside an HTTP error keeps its message (so a too-wide log range is narrowed)', async () => {
