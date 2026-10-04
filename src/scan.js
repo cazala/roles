@@ -44,6 +44,9 @@ const deployKey = (chain, address) => 'deploy:' + chain + ':' + address;
 export const knownDeployment = (chain, address) => { const b = load(deployKey(chain, address), null); return Number.isSafeInteger(b) && b >= 0 ? b : null; };
 // Reorgs only touch recent blocks: when the cached tip changed, the events older than this many blocks are kept.
 export const REORG_DEPTH = 1000;
+// An indexer (Etherscan) can lag the chain by a few blocks: events of the newest blocks may appear only later. With
+// one, every scan reads the last INDEX_LAG blocks again, so a cache never skips what was indexed late.
+export const INDEX_LAG = 128;
 
 export async function scan(request, { address, chain, block, signal, progress = () => {}, start, budget = 24 }) {
   const key = 'scan:2:' + chain + ':' + address;
@@ -58,6 +61,10 @@ export async function scan(request, { address, chain, block, signal, progress = 
       if (keep >= cache.start) (cache.logs = cache.logs.filter((l) => Number(BigInt(l.blockNumber)) <= keep)), (cache.last = keep), (cache.hash = null);
       else cache = null;
     }
+  }
+  if (cache && request.wide && cache.last >= cache.start) {
+    const keep = Math.max(cache.start - 1, cache.last - INDEX_LAG);
+    (cache.logs = cache.logs.filter((l) => Number(BigInt(l.blockNumber)) <= keep)), (cache.last = keep), (cache.hash = null);
   }
   if (!cache) {
     const known = start == null ? knownDeployment(chain, address) : null;
