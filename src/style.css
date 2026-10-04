@@ -661,3 +661,4 @@ p.lead { margin: 4px 0 8px; }
 .proposal details { margin: 8px 0 0; border: 0; }
 .proposal details > summary { font-size: 13px; color: var(--mut); }
 .proposal ol { margin: 6px 0 0; padding-left: 20px; overflow-wrap: anywhere; }
+.taddr { display: flex; flex-wrap: wrap; align-items: center; gap: 0 2px; }
