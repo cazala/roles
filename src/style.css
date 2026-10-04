@@ -693,3 +693,6 @@ p.lead { margin: 4px 0 8px; }
 nav.mtabs { align-items: center; margin-bottom: 14px; }
 nav.mtabs .grow { flex: 1; }
 nav.mtabs .tact { display: inline-flex; padding: 4px 0 6px; }
+
+/* A Safe that already has a working Roles modifier: creating another is a quiet link under its modules. */
+p.another { margin: 10px 0 0; font-size: 13px; }
