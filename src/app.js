@@ -168,10 +168,17 @@ export function settingsDialog() {
   const defs = explorerDefaults().map((id) => byId(id).name);
   const xpick = h('select', { 'aria-label': 'Block explorer' }, h('option', { value: 'default' }, defs.length ? 'Default (' + defs.join(', ') + ')' : 'Default (none)'), h('option', { value: 'none' }, 'None'), provs.map((p) => h('option', { value: p.id }, p.name)), h('option', { value: 'custom' }, 'Custom…'));
   const xurl = h('input', { value: ch.url, placeholder: 'https://explorer.example/api?chainid={chain}', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Block explorer API URL' });
-  const xkey = h('input', { spellcheck: 'false', autocomplete: 'off' }), keyName = h('b'), keyNote = h('span.mut.small'), keyBox = h('div.xkey', h('div.bsec', keyName, keyNote), xkey);
-  const covers = h('p.mut.small'), xsave = h('button', 'Save'), xout = h('div');
+  const xkey = h('input', { spellcheck: 'false', autocomplete: 'off' }), keyName = h('b'), keyNote = h('span.mut.small'), xsave = h('button', 'Save'), keyBox = h('div.xkey', h('div.bsec', keyName, keyNote), h('div.row', xkey, xsave));
+  const covers = h('span'), flash = h('span.ok.xflash'), xout = h('div');
   // Which chains load through the explorer: the ones it covers, by name; the rest read block by block through the RPC.
   const chainsOf = (p) => (p ? [...Object.keys(p.urls || {}), ...(p.chains || [])].map(Number) : []);
+  // A choice that needs nothing typed applies at once; Etherscan without a key, or Custom without a URL, waits for
+  // its field (the previous choice stays in effect meanwhile). The line under the choice says what it covers.
+  const nameOf = (id) => (id === 'default' ? 'Default' : id === 'none' ? 'None' : id === 'custom' ? 'Custom' : byId(id).name);
+  const ready = (id) => (id === 'custom' ? !!ch.url : !(byId(id) && byId(id).key === 'required' && !ch.keys[id]));
+  let timer;
+  const saved = () => (put(flash, ' ✓ Saved'), clearTimeout(timer), (timer = setTimeout(() => put(flash), 2000)));
+  const done = () => (Object.assign(ch, explorerChoice()), forget(), route());
   const shape = () => {
     const id = xpick.value, p = byId(id), named = p ? p.name + ' API key' : 'Block explorer API key';
     xurl.hidden = id !== 'custom';
@@ -179,15 +186,34 @@ export function settingsDialog() {
     put(keyName, named);
     put(keyNote, p && p.key === 'required' ? ' · required' : ' · optional');
     xkey.value = ch.keys[id] || '';
+    xurl.value = ch.url;
     xkey.placeholder = p && p.keyUrl ? 'Get one at ' + p.keyUrl.replace(/^https:\/\/(www\.)?/, '') : named;
     xkey.setAttribute('aria-label', named);
     const ids = id === 'default' ? [...new Set(explorerDefaults().flatMap((d) => chainsOf(byId(d))))] : chainsOf(p);
-    put(covers, p && p.note ? p.note : id === 'none' ? 'History reads every block through your RPC.' : id === 'custom' ? 'Used on every chain; {chain} becomes the chain ID.' : ids.length ? 'Covers ' + ids.sort((a, b) => a - b).map(network).join(', ') + '. Other chains read block by block through your RPC.' : '');
+    put(covers, id !== ch.id && !ready(id) ? (id === 'custom' ? 'Enter its API URL to use it.' : 'Add your key to use ' + p.name + '.') + ' Until then: ' + nameOf(ch.id) + '.' : p && p.note ? p.note : id === 'none' ? 'History reads every block through your RPC.' : id === 'custom' ? 'Used on every chain; {chain} becomes the chain ID.' : ids.length ? 'Covers ' + ids.sort((a, b) => a - b).map(network).join(', ') + '. Other chains read block by block through your RPC.' : '');
+    put(xsave, 'Save');
+    dirty();
   };
+  // Save is live only while the field differs from what is in effect.
+  const dirty = () => (xsave.disabled = xpick.value === ch.id && xkey.value.trim() === (ch.keys[xpick.value] || '') && (xpick.value !== 'custom' || xurl.value.trim() === ch.url));
   xpick.value = byId(ch.id) || ['default', 'none', 'custom'].includes(ch.id) ? ch.id : 'default';
-  xpick.onchange = () => (shape(), put(xout), xpick.value === 'custom' ? xurl.focus() : !keyBox.hidden && xkey.focus());
+  xpick.onchange = () => {
+    const id = xpick.value;
+    put(xout), put(flash);
+    if (ready(id)) {
+      try { setExplorer({ id, url: ch.url, key: ch.keys[id] || '' }); done(); saved(); } catch (e) { put(xout, bad(e.message)); }
+    }
+    shape();
+    if (!ready(id)) (id === 'custom' ? xurl : xkey).focus();
+  };
+  xkey.oninput = xurl.oninput = () => (dirty(), put(xsave, 'Save'));
+  xkey.onkeydown = xurl.onkeydown = (e) => e.key === 'Enter' && !xsave.disabled && xsave.click();
+  xsave.onclick = () => {
+    put(xout);
+    try { setExplorer({ id: xpick.value, url: xurl.value, key: xkey.value }); done(); shape(); put(xsave, 'Saved ✓'); }
+    catch (e) { put(xout, bad(e.message)); }
+  };
   shape();
-  xsave.onclick = act(xsave, async () => { setExplorer({ id: xpick.value, url: xurl.value, key: xkey.value }); Object.assign(ch, explorerChoice()); put(xout, h('p.ok', 'Saved.')); (forget(), route()); }, xout);
   // safe.wei's gateway, where Safe transactions are handed off and the footer links: one of the built-in ones
   // (config/links.json) or your own. The default follows this page's gateway, else the first; only a choice is saved.
   const gws = LINK.safe || [], cur = savedGateway(), gwOut = h('div');
@@ -209,7 +235,7 @@ export function settingsDialog() {
     h('div.row', url, add),
     h('div.bsec', h('b', 'Block explorer')),
     h('p.mut.small', 'Speeds up history and shows contract names. Each result is checked against the chain; a missing one can’t be detected, so pick an explorer you trust.'),
-    h('div.xpick', xpick, xurl, keyBox), covers, h('div.actions', xsave), xout,
+    h('div.xpick', xpick, xurl, keyBox), xout, h('p.mut.small.xline', covers, flash),
     h('p.mut.small', 'All kept in this browser.'),
     out,
   );
