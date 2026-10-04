@@ -58,14 +58,16 @@ export function rolesPage(ctx) {
       put(content, list.length ? h('div.slist', list.map(roleRow)) : h('p.empty', q ? 'No role matches.' : ctx.complete ? 'No roles yet.' + (ed ? ' Choose + New role to start.' : '') : 'No roles found in this part of the history.'));
     }
   };
+  const action = (which) => ed && (which === 'members' ? h('button.sm', { onclick: () => ed.memberRoles() }, '+ Add member') : h('button.sm', { onclick: ed.newRole }, '+ New role'));
   const show = (which) => {
     view = which;
-    put(tabs, [['roles', 'Roles · ' + roles.length], ['members', 'Members · ' + Object.keys(who).length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)), h('span.grow'),
-      ed && (which === 'members' ? h('button.sm', { onclick: () => ed.memberRoles() }, '+ Add member') : h('button.sm', { onclick: ed.newRole }, '+ New role')));
+    // The modifier's tab row (Roles · Members · Allowances) shows the counts and the action; without it, a local one.
+    if (ctx.tabs) ctx.tabs.counts({ roles: roles.length, members: Object.keys(who).length, allowances: Object.keys(ctx.state.allowances).length }), ctx.tabs.action(action(which));
+    else put(tabs, [['roles', 'Roles · ' + roles.length], ['members', 'Members · ' + Object.keys(who).length]].map(([id, text]) => h('a' + (id === which ? '.on' : ''), { href: '#', onclick: (e) => (e.preventDefault(), show(id)) }, text)), h('span.grow'), action(which));
     draw();
   };
   search.oninput = draw;
-  show(view);
-  return h('div.rolespage', roles.length + Object.keys(who).length > SEARCH_FROM && search, tabs, content,
+  show(ctx.tabs ? (location.hash.split('?')[0].endsWith('/members') ? 'members' : 'roles') : view);
+  return h('div.rolespage', roles.length + Object.keys(who).length > SEARCH_FROM && search, !ctx.tabs && tabs, content,
     ed && h('details.msettings', h('summary', 'Modifier settings'), h('div.actions', h('button', { onclick: ed.settings }, 'Owner, avatar and target'), h('button', { onclick: ed.unwrap }, 'Transaction unwrapper'))));
 }

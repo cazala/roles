@@ -64,7 +64,10 @@ const amount = (v, u) => formatUnits(big(v), u.decimals) + ' ' + u.symbol;
 /** The Allowances page: one card per allowance (and per key a condition uses but that was never set). */
 export function allowancesView(ctx) {
   const ed = ctx.edit, all = uses(ctx.state), keys = [...new Set([...Object.keys(ctx.state.allowances), ...Object.keys(all)])];
-  const root = h('div.allowances', h('div.rhead', h('h2', 'Allowances'), h('span.grow'), ed && h('button.sm', { onclick: () => allowanceDialog(ctx) }, '+ New allowance')),
+  const add = ed && h('button.sm', { onclick: () => allowanceDialog(ctx) }, '+ New allowance');
+  // With the modifier's tab row, the action and the counts go there; the page starts with what an allowance is.
+  if (ctx.tabs) ctx.tabs.action(add), ctx.tabs.counts({ allowances: keys.length, roles: Object.keys(ctx.state.roles).length, members: new Set(Object.values(ctx.state.roles).flatMap((r) => Object.keys(r.members).filter((m) => r.members[m]))).size });
+  const root = h('div.allowances', !ctx.tabs && h('div.rhead', h('h2', 'Allowances'), h('span.grow'), add),
     h('p.mut.small', 'A budget a role spends through its conditions: an amount of a parameter (Within allowance), ETH sent, or a number of calls. It refills by an amount every period, up to a cap.'));
   if (!keys.length) root.append(h('p.empty', 'No allowances yet.'));
   const now = BigInt(ctx.snapshot.timestamp);

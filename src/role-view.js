@@ -2,7 +2,7 @@
 // and Members. Function and parameter names are display only: an ABI entry is used for a function only when it
 // hashes to that function's selector, which is what executes. Values are decoded by the ABI type when known,
 // and otherwise shown exactly as encoded.
-import { h, put, addr, warn, copy, menu, sheet, toClipboard, copyButton } from './ui.js';
+import { h, put, addr, warn, copy, menu, sheet, toClipboard, copyButton, tagButton } from './ui.js';
 import { parseAbi } from './abicoder.js';
 import { toTree, TYPES } from './conditions.js';
 import { keyName, json } from './roles.js';
@@ -158,7 +158,15 @@ function abiDialog(ctx, address, done) {
 function targetView(t, ctx, key) {
   const ed = ctx.edit, was = ed && ctx.base?.roles[key]?.targets[t.address];
   const m = ed ? (t.clearance === 0 ? 'gone' : !was || was.clearance === 0 ? 'new' : was.clearance !== t.clearance || was.options !== t.options ? 'changed' : null) : null;
-  const fns = Object.values(t.functions), unnamed = () => labels.get(t.address) || 'Unnamed contract', title = h('b.tname' + (labels.get(t.address) ? '' : '.mut'), unnamed()), body = h('div.tbody'), note = h('span.mut.small.tnote');
+  const fns = Object.values(t.functions), title = h('b.tname'), hint = h('span.mut.aname'), body = h('div.tbody'), note = h('span.mut.small.tnote');
+  // The title: your label, else the contract's name (your ABI, Etherscan), else "Unnamed contract". With a label,
+  // the contract's name stays next to the address as a hint.
+  const titled = () => {
+    const l = labels.get(t.address), n = names && names.name;
+    put(title, l || n || 'Unnamed contract');
+    title.classList.toggle('mut', !l && !n);
+    put(hint, l && n && n !== l ? n : null);
+  };
   // Functions the draft revoked, still shown (struck) so they can be restored.
   // In the editor, functions keep their places: the base's order (revoked ones struck), then the new ones.
   const order = ed && was && was.clearance && m !== 'gone' ? [...new Set([...Object.keys(was.functions), ...Object.keys(t.functions)])] : Object.keys(t.functions);
@@ -168,7 +176,7 @@ function targetView(t, ctx, key) {
     names = n;
     const fnMark = (fn) => ed && was && was.clearance ? mark(was.functions[fn.selector], fn) : ed ? 'new' : null;
     put(body, m === 'gone' ? null : t.clearance === 1 ? h('div.fn', h('div.fnhead', h('span', 'Every function of this contract'), chips(t.options))) : order.length ? order.map((k) => { const fn = t.functions[k] || was.functions[k]; return fnView(fn, n && n.fns.get(sel(k)), t, ctx, t.functions[k] ? fnMark(fn) : 'gone'); }) : h('p.mut.fnfree.fn', 'No functions configured.'));
-    if (n) put(title, n.name || unnamed()), title.classList.toggle('mut', !n.name && !labels.get(t.address));
+    titled();
     put(note, n && n.source ? h('span', { title: 'Names are labels only: each one matches the selector that executes.' }, 'Names from ' + n.source) : n ? ['No ABI for this contract. ', h('button.link', { onclick: openAbi }, 'Add contract ABI')] : null);
   };
   const reload = () => namesFor(ctx.chain, t.address).then(draw, () => {});
@@ -185,7 +193,11 @@ function targetView(t, ctx, key) {
     ed && ['Revoke target', () => ed.revokeTarget(t), true],
   ], 'Target actions');
   const foot = h('div.tfoot', ed && t.clearance === 2 && h('button.link.addfn', { onclick: () => ed.addFunction(t, names) }, '+ Add function'), h('span.grow'), note);
-  return h('section.tcard' + (m ? '.pend' : '') + (m === 'gone' ? '.gone' : ''), h('div.thead', h('div.tid', title, addr(t.address, null, null, true)), markChip(m), m !== 'gone' && h('span.chip' + (t.clearance === 0 ? '.warn' : ''), clearance), actions), body, m !== 'gone' && foot);
+  const card = h('section.tcard' + (m ? '.pend' : '') + (m === 'gone' ? '.gone' : ''), h('div.thead', h('div.tid', title, h('span.taddr', addr(t.address, null, null, true), tagButton(t.address), hint)), markChip(m), m !== 'gone' && h('span.chip' + (t.clearance === 0 ? '.warn' : ''), clearance), actions), body, m !== 'gone' && foot);
+  // A label set or changed (here or anywhere) retitles the card.
+  const onLabels = (e) => (card.isConnected ? String(e.detail).toLowerCase() === t.address.toLowerCase() && titled() : removeEventListener('labels', onLabels));
+  addEventListener('labels', onLabels);
+  return card;
 }
 
 /** The role page: header, then Permissions and Members. */
