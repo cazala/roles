@@ -391,6 +391,15 @@ details.edetail pre { max-height: 180px; overflow: auto; font-size: 11px; white-
 .role h2 { margin-bottom: 4px; }
 p.rkey { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; overflow-wrap: anywhere; }
 nav.rtabs { margin-bottom: 14px; }
+/* A role's members, on one line under its key: each with its chips and ⋯, then + Add member. */
+.rmembers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 4px 0 18px; font-size: 14px; }
+.rmembers .rlabel { font-size: 13px; }
+.rmem { display: inline-flex; align-items: center; gap: 6px; }
+.rmem.gone > :first-child { text-decoration: line-through; opacity: .6; }
+/* Permissions: a heading with its count and + Add target, right above the cards. */
+.rsec { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+.rsec h3 { margin: 0; font-size: 15px; }
+.rsec .grow { flex: 1; }
 .tcard { margin: 0 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 .thead { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .tid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
