@@ -49,7 +49,7 @@ export function targetForm(ctx,key) {
   const have=Object.values(draft(ctx).value.roles[key]?.targets||{}).filter(t=>t.clearance).map(t=>t.address);
   form('Add target',[{key:'address',label:'Target contract address',hint:'The contract this role may call.',suggest:()=>labelled(have)},{key:'mode',label:'Access',value:2,options:[[2,'Only functions I add'],[1,'Every function']]},{key:'options',label:'Execution options (every function)',value:0,options:opOptions,info:OPTIONS_HINT}],v=>mutate(ctx,s=>{const a=checkAddress(v.address),t=target(s,key,a);if(t.clearance)throw Error('This role already has this target.');t.clearance=Number(v.mode);t.options=t.clearance===1?Number(v.options):0;}));
 }
-/** Add a function to a scoped target: pick it from the contract's ABI (yours or Etherscan's), or type a signature or selector. */
+/** Add a function to a scoped target: pick it from the contract's ABI (yours or the block explorer's), or type a signature or selector. */
 function addFunction(ctx,key,t,names) {
   const {body,close}=sheet('edit','Add function',true),out=h('div');
   const options=h('select',{'aria-label':'Execution options'},opOptions.map(([value,text])=>h('option',{value},text)));
@@ -185,7 +185,7 @@ export function review(ctx) {
   const d=draft(ctx),calls=diff(d.base,d.value,ctx.address),{body,close}=sheet('people','Review changes',true);
   body.classList.add('fulladdr');
   const risky=calls.filter(c=>c.danger).length;
-  // Names for each target (your ABI, Etherscan's, standard interfaces; each matched by its selector).
+  // Names for each target (your ABI, the block explorer's, standard interfaces; each matched by its selector).
   const names={},loading=Object.fromEntries([...new Set(calls.map(callTarget).filter(Boolean))].map(a=>[a,namesFor(ctx.chain,a).then(n=>(names[a]=n),()=>null)]));
   const card=(c,i)=>{const ps=params(c),n=loading[callTarget(c)]||Promise.resolve(null);return h('section.rvcall',h('div.rvtop',h('span.rvnum',String(i+1)),h('b',ACTION[c.signature.split('(')[0]]||c.text),c.danger&&h('span.chip.warn','Widens access')),
     h('table.kv.rvargs',ps.map((p,j)=>h('tr',h('th',p.name),h('td',argView(p,c.args[j],n))))),

@@ -3,7 +3,7 @@
 An interface for [Zodiac Roles](https://github.com/gnosisguild/zodiac-modifier-roles) (Roles Modifier v2) on [Safe](https://safe.global) accounts that lives on Ethereum. Give an address, a bot or an agent permission to call specific contract functions through a Safe, with conditions on the parameters and spending allowances, without the Safe's full threshold. Sibling app: **[safe.wei](https://github.com/cazala/safe)**, where the Safe's owners review and sign.
 
 - **One self-contained HTML file**: no backend, no remote code, no analytics.
-- **Reads from the chain**: a modifier's permissions are rebuilt from its own event history, read through your wallet's RPC (or your own RPC endpoint; optionally Etherscan's index with your own key, for speed). No subgraph, no Zodiac API.
+- **Reads from the chain**: a modifier's permissions are rebuilt from its own event history, read through your wallet's RPC (or your own RPC endpoint; a block explorer's index for speed: Blockscout or Routescan by default, every event checked against the chain). No subgraph, no Zodiac API.
 - **Signs through your wallet**: roles.wei never holds a key; changes a Safe owns go to safe.wei for the owners.
 - **Served onchain** from an ERC-8244 `html()` contract at `roles.wei`, or from any copy of the file.
 - **Agent ready**: permission changes can be proposed by link, for people to review in the editor and apply. See [Agents](#agents).
@@ -16,9 +16,9 @@ An interface for [Zodiac Roles](https://github.com/gnosisguild/zodiac-modifier-r
 - Your Safes and modifiers on Home: search or open, rename, network shown only when it differs from yours.
 
 **Read**
-- The complete permission history, scanned in resumable steps and cached, with progress and an estimate; through Etherscan in seconds with a key.
+- The complete permission history, scanned in resumable steps and cached, with progress and an estimate; through a block explorer in seconds.
 - Roles at a glance (targets by name, members, counts) and a Members view: what each address can do, its default role.
-- A role's permissions as cards: each target, its functions with their signatures, conditions as a parameter table (AND / OR groups as brackets), names from your ABI, Etherscan's verified source or standard interfaces, and contract names next to addresses.
+- A role's permissions as cards: each target, its functions with their signatures, conditions as a parameter table (AND / OR groups as brackets), names from your ABI, the block explorer's verified source or standard interfaces, and contract names next to addresses.
 - Allowances read as sentences: what is available now, the refill and its period, the cap, the next refill, in the token's own units.
 
 **Edit, in place**
@@ -30,7 +30,7 @@ An interface for [Zodiac Roles](https://github.com/gnosisguild/zodiac-modifier-r
 
 **Yours, in the browser**
 - Labels, saved addresses and contract ABIs, moved between devices with Backup & sync (it reads safe.wei backups too).
-- **Settings**: the safe.wei gateway to hand off to, your own RPC endpoints, an optional Etherscan key.
+- **Settings**: the safe.wei gateway to hand off to, your own RPC endpoints, the block explorer (Default, None, Etherscan with a key, Blockscout, Routescan, or any Etherscan-compatible API).
 
 ## Agents
 

@@ -7,7 +7,7 @@ import { allowancesView } from './allowances.js';
 import { rolesPage } from './roles-list.js';
 import { h, put, addr, bad, warn, act, short, icon } from './ui.js';
 import { session, route, settingsDialog } from './app.js';
-import { explorerKey } from './reads.js';
+import { explorerRefused, explorerSuggestion } from './reads.js';
 import { identify, metadata, safeModules, replay, keyName, json, quantity } from './roles.js';
 import { scan, clearScan } from './scan.js';
 
@@ -43,7 +43,7 @@ const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 
 export async function renderAddress(address, path, epoch) {
   const provider = session.provider, chain = session.chain;
   const request = async (method, params = []) => { if (epoch !== session.epoch) throw Error('Wallet or page changed.'); const value = await provider.request({ method, params }); if (epoch !== session.epoch) throw Error('Wallet or page changed.'); return value; };
-  Object.defineProperty(request, 'wide', { get: () => !!provider.wide }); // Etherscan in use: whole log ranges at once
+  Object.defineProperty(request, 'wide', { get: () => !!provider.wide }); // a block explorer in use: whole log ranges at once
   const k = chain + ':' + address + ':' + session.account, hit = loaded.get(k);
   const refresh = () => { loaded.delete(k); route(); };
   const snapshot = hit ? hit.snapshot : await request('eth_getBlockByNumber', ['latest', false]);
@@ -87,8 +87,14 @@ export async function renderAddress(address, path, epoch) {
     fill.style.width = (pct || 0) + '%';
     put(hint, tip);
   };
-  // While a scan runs block by block, point to the fast path: an Etherscan key loads it in a few requests.
-  const tip = () => !explorerKey() && !request.wide && [h('a.hint', { href: '#', title: 'An Etherscan API key loads the history in a few requests instead of scanning block by block', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Add an Etherscan key'), ' to load instantly'];
+  // While a scan runs block by block, point to the fast path (a block explorer's index loads it in a few requests),
+  // or say why the explorer is not in use (it does not cover this chain, or is busy).
+  const tip = () => {
+    if (request.wide) return null;
+    const no = explorerRefused(chain), x = explorerSuggestion(chain);
+    if (no) return no.name + (no.busy ? ' is busy right now' : ' doesn’t cover this chain') + ', so this reads the blocks through your RPC.';
+    return ['Slow? ', h('a.hint', { href: '#', onclick: (e) => (e.preventDefault(), settingsDialog()) }, 'Use ' + (x ? x + '’s' : 'a block explorer’s') + ' index'), ' to load the whole history in seconds. Every event is still checked against the chain.'];
+  };
   const start = h('input', { 'aria-label': 'Start block', placeholder: 'Automatic', inputmode: 'numeric' });
   let controller, scanning = false, last = null;
   const run = async () => {
@@ -126,12 +132,12 @@ export async function renderAddress(address, path, epoch) {
       if (epoch !== session.epoch || controller !== mine) return;
       if (mine.signal.aborted) show('paused', 'Paused' + (last != null ? ' at ' + last + '%' : ''), button('Resume', run));
       // The RPC advice only where an RPC is the problem.
-      // RPC trouble: offer the ways around it right there (your RPC, or Etherscan's index).
+      // RPC trouble: offer the ways around it right there (your RPC, or a block explorer's index).
       else {
         const rpc = /stopped at block|could not be reached|rpc|history|pruned|archive|answered/i.test(e.message);
         // Details: the stack and the build, so an unexpected error can be traced to its line.
         const details = h('details.edetail', h('summary', 'Details'), h('pre', 'build ' + __BUILD__ + '\n' + (e.stack || e.message)));
-        show('error', e.message.replace(/\.?$/, '.'), button('Retry', run), null, [rpc && h('span.fixes', 'Get around it: ', h('a.hint', { href: '#', onclick: (x) => (x.preventDefault(), settingsDialog()) }, 'Add your own RPC'), ' or ', h('a.hint', { href: '#', onclick: (x) => (x.preventDefault(), settingsDialog()) }, 'an Etherscan key'), '.'), details]);
+        show('error', e.message.replace(/\.?$/, '.'), button('Retry', run), null, [rpc && h('span.fixes', 'Get around it: ', h('a.hint', { href: '#', onclick: (x) => (x.preventDefault(), settingsDialog()) }, 'Add your own RPC'), ' or ', h('a.hint', { href: '#', onclick: (x) => (x.preventDefault(), settingsDialog()) }, 'a block explorer'), '.'), details]);
       }
     }
     finally { if (controller === mine) scanning = false; }

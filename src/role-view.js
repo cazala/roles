@@ -6,7 +6,7 @@ import { h, put, addr, warn, copy, menu, sheet, toClipboard, copyButton, tagButt
 import { parseAbi } from './abicoder.js';
 import { toTree, TYPES } from './conditions.js';
 import { keyName, json } from './roles.js';
-import { explorerKey, explorerSource } from './reads.js';
+import { explorerFor, explorerSource } from './reads.js';
 import { load, store } from './store.js';
 import * as labels from './labels.js';
 import { readAbi } from './abifile.js';
@@ -21,32 +21,34 @@ const sel = (s) => String(s).toLowerCase().replace(/^0x/, '');
 const pastedKey = (chain, address) => 'abi:' + chain + ':' + address, nameKey = (chain, address) => 'abiname:' + chain + ':' + address;
 
 
-/** Names for a target: { name, source, fns: Map(selector → function) }. Your ABI, else Etherscan's, else standard ones. */
+/** Names for a target: { name, source, fns: Map(selector → function) }. Your ABI, else the block explorer's, else standard ones. */
 export async function namesFor(chain, address) {
   const fns = new Map(), add = (list) => list.forEach((f) => f.selector && !fns.has(f.selector) && fns.set(f.selector, f));
   let name = load(nameKey(chain, address), '') || null, source = null, missing = null, explorer = false;
   const pasted = load(pastedKey(chain, address), '');
   if (pasted) { try { add(parseAbi(pasted)); source = 'your ABI'; } catch {} }
-  if (explorerKey()) {
+  const e = explorerFor(chain);
+  if (e) {
     try {
-      const s = await explorerSource(explorerKey(), chain, address);
+      const s = await explorerSource(e, chain, address);
       name = name || s.name;
-      if (s.abi) add(parseAbi(s.abi)), (source = source || 'Etherscan (verified source)'), (explorer = true);
-      else missing = 'Etherscan has no verified source for this contract.';
+      if (s.abi) add(parseAbi(s.abi)), (source = source || e.name + ' (verified source)'), (explorer = true);
+      else missing = e.name + ' has no verified source for this contract.';
     } catch (e) { missing = e.message; }
   }
-  const abi = [...fns.values()]; // from a real ABI (yours or Etherscan's): what Add function offers
+  const abi = [...fns.values()]; // from a real ABI (yours or the block explorer's): what Add function offers
   const before = fns.size;
   add(STANDARD);
   if (fns.size > before && !source) source = 'standard interfaces';
   return { name, source, fns, abi, missing, explorer, pasted: !!pasted };
 }
 
-// An address with its contract name next to it, muted, when an Etherscan key is set and the contract is
-// verified there (wallets have none). The address stays: the name is a hint from Etherscan, not a claim we check.
+// An address with its contract name next to it, muted, when a block explorer serves the chain and the contract is
+// verified there (wallets have none). The address stays: the name is a hint from the explorer, not a claim we check.
 export function named(chain, a) {
   const tag = h('span.mut.aname');
-  if (explorerKey()) explorerSource(explorerKey(), chain, a).then((s) => s.name && put(tag, s.name), () => {});
+  const e = explorerFor(chain);
+  if (e) explorerSource(e, chain, a).then((s) => s.name && put(tag, s.name), () => {});
   return [addr(a), tag];
 }
 
@@ -159,7 +161,7 @@ function targetView(t, ctx, key) {
   const ed = ctx.edit, was = ed && ctx.base?.roles[key]?.targets[t.address];
   const m = ed ? (t.clearance === 0 ? 'gone' : !was || was.clearance === 0 ? 'new' : was.clearance !== t.clearance || was.options !== t.options ? 'changed' : null) : null;
   const fns = Object.values(t.functions), title = h('b.tname'), hint = h('span.mut.aname'), body = h('div.tbody'), note = h('span.mut.small.tnote');
-  // The title: your label, else the contract's name (your ABI, Etherscan), else "Unnamed contract". With a label,
+  // The title: your label, else the contract's name (your ABI, the block explorer), else "Unnamed contract". With a label,
   // the contract's name stays next to the address as a hint.
   const titled = () => {
     const l = labels.get(t.address), n = names && names.name;

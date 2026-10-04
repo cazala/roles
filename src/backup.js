@@ -1,6 +1,6 @@
 // Backup & sync: what this browser keeps for roles.wei (saved addresses, labels, contract ABIs and names), as JSON
 // or a link to open on another device. Reads safe.wei backups too (their Safes, labels and ABIs). Your RPC
-// endpoints and Etherscan key are never included: they are credentials.
+// endpoints and block explorer keys are never included: they are credentials.
 import { utf8 } from './abi.js';
 import { load as read, store as write } from './store.js';
 

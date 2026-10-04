@@ -12,7 +12,7 @@ const members = (r) => Object.entries(r.members).filter(([, yes]) => yes).map(([
 const targets = (r) => Object.values(r.targets).filter((t) => t.clearance);
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-/** A target by name: your label, else its contract name (your ABI or Etherscan's), else its token symbol, else short. */
+/** A target by name: your label, else its contract name (your ABI or the block explorer's), else its token symbol, else short. */
 function targetName(ctx, a) {
   const el = h('span', labels.get(a) || short(a));
   if (!labels.get(a)) namesFor(ctx.chain, a).then(async (n) => { const t = n.name ? null : await token(ctx, a); if (n.name || t?.symbol) put(el, n.name || t.symbol); }, () => {});
