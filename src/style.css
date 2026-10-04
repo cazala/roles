@@ -322,6 +322,11 @@ button#connect { white-space: nowrap; }
 .qracts { justify-content: center; }
 /* Roles additions; the preceding safe.wei stylesheet is copied verbatim. */
 .srow a.name { color: inherit; text-decoration: none; }
+/* A Safe's module cards: an openable card highlights as a whole (its rows don't), rounded by the list's first and last child rules. */
+.smod.open { cursor: pointer; }
+.smod.open:hover { background: var(--bg); }
+.smod .srow:hover { background: none; }
+.smod + .smod { border-top: 1px solid var(--line); }
 main h1 { font-size: 22px; }
 .modulemeta { padding: 0 14px 10px; font-size: 13px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Menlo, monospace; }
