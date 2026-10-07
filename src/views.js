@@ -61,7 +61,7 @@ export async function renderAddress(address, path, epoch) {
     }));
     // A Safe with a working Roles modifier needs no Create card: another one is a quiet link under the list.
     const create = hooks.create ? hooks.create({ address, safe, request, snapshot, chain, start: /[?&]create\b/.test(location.hash), has: modules.some((c) => c.working) }) : {};
-    return Object.assign(h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), create.top, modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'), create.foot), { kind: 'safe' }); // what Home and the Safe picker list it as
+    return Object.assign(h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), create.top, modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'), create.foot), { kind: 'safe', facts: { threshold: Number(safe.threshold), owners: safe.owners.length } }); // what Home and the Safe picker list it as
   }
   const meta = hit ? hit.meta : await metadata(request, address, snapshot.number);
   let ownerSafe = hit ? hit.ownerSafe : false;
@@ -69,6 +69,7 @@ export async function renderAddress(address, path, epoch) {
   const ownerSupported=meta.owner===session.account||ownerSafe;
   const root = h('div', h('h1', 'Roles ' + info.version), addr(address), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), !ownerSupported&&warn('This owner is neither the connected wallet nor a readable Safe. You can inspect permissions and prepare calls, but roles.wei cannot submit them for this owner.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
   root.kind = 'roles';
+  root.facts = { avatar: meta.avatar.toLowerCase(), version: info.version }; // Home nests it under its Safe
   if (!info.supported) { root.append(h('p.mut', 'This implementation is identified but is not supported for permission decoding or editing.'), h('details', h('summary', 'Implementation'), addr(info.implementation), h('pre', info.code))); return root; }
   // The tabs sit right above what they switch: the history status, a link's proposal and the pending changes
   // concern the whole modifier and come first (`top`, which the editor fills).
