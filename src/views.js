@@ -5,11 +5,28 @@ import { editConditions } from './condition-edit.js';
 import { conditionView } from './condition-view.js';
 import { allowancesView } from './allowances.js';
 import { rolesPage } from './roles-list.js';
-import { h, put, addr, bad, warn, act, short, icon } from './ui.js';
+import { h, put, addr, bad, warn, act, short, icon, tagButton } from './ui.js';
 import { session, route, settingsDialog } from './app.js';
 import { explorerRefused, explorerSuggestion } from './reads.js';
 import { identify, metadata, safeModules, replay, keyName, json, quantity } from './roles.js';
 import { scan, clearScan } from './scan.js';
+import { nameOf } from './names.js';
+import * as labels from './labels.js';
+
+/**
+ * A page's title, as safe.wei titles a Safe: your label, else its ENS / WNS name (looked up), else `kind` and the
+ * short address. Kept current when you label it. What it is (version, owners) goes on the line under it.
+ */
+function titleOf(address, kind) {
+  const el = h('h1.ptitle');
+  let name = '';
+  const draw = () => put(el, labels.get(address) || name || kind + ' ' + short(address));
+  draw();
+  nameOf(address, session.chain).then((n) => n && ((name = n), el.isConnected && draw()), () => {});
+  const on = (e) => (el.isConnected ? String(e.detail).toLowerCase() === address && draw() : removeEventListener('labels', on));
+  addEventListener('labels', on);
+  return el;
+}
 
 export const hooks = { conditions: conditionView, allowances: allowancesView, body: editBody, create: createView };
 editorHooks.use = useRole;
@@ -61,14 +78,15 @@ export async function renderAddress(address, path, epoch) {
     }));
     // A Safe with a working Roles modifier needs no Create card: another one is a quiet link under the list.
     const create = hooks.create ? hooks.create({ address, safe, request, snapshot, chain, start: /[?&]create\b/.test(location.hash), has: modules.some((c) => c.working) }) : {};
-    return Object.assign(h('div', h('h1', 'Roles modifiers'), addr(address), h('p.mut', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners'), create.top, modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'), create.foot), { kind: 'safe' }); // what Home and the Safe picker list it as
+    return Object.assign(h('div', titleOf(address, 'Safe'), h('p.mut.pmeta', h('span.paddr', addr(address, null, short(address), true), tagButton(address)), h('span', 'Safe ' + safe.version + ' · ' + safe.threshold + ' of ' + safe.owners.length + ' owners')), create.top, h('h2.psec', 'Modules'), modules.length ? h('div.slist', modules) : h('p.empty', 'No modules enabled on this Safe.'), create.foot), { kind: 'safe', facts: { threshold: Number(safe.threshold), owners: safe.owners.length } }); // what Home and the Safe picker list it as
   }
   const meta = hit ? hit.meta : await metadata(request, address, snapshot.number);
   let ownerSafe = hit ? hit.ownerSafe : false;
   if(!hit&&meta.owner!==session.account)try{await safeModules(request,meta.owner,snapshot.number);ownerSafe=true;}catch{}
   const ownerSupported=meta.owner===session.account||ownerSafe;
-  const root = h('div', h('h1', 'Roles ' + info.version), addr(address), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), !ownerSupported&&warn('This owner is neither the connected wallet nor a readable Safe. You can inspect permissions and prepare calls, but roles.wei cannot submit them for this owner.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
+  const root = h('div', titleOf(address, 'Roles modifier'), h('p.mut.pmeta', h('span.paddr', addr(address, null, short(address), true), tagButton(address)), h('span', 'Roles ' + info.version)), h('p', 'Owner ', addr(meta.owner), ' · Avatar ', addr(meta.avatar), ' · Target ', addr(meta.target)), meta.owner !== meta.avatar && warn('The owner differs from the avatar. This owner can grant itself access to the avatar’s assets.'), !ownerSupported&&warn('This owner is neither the connected wallet nor a readable Safe. You can inspect permissions and prepare calls, but roles.wei cannot submit them for this owner.'), info.faulty && warn('This Roles version is faulty. Permission changes are disabled.'));
   root.kind = 'roles';
+  root.facts = { avatar: meta.avatar.toLowerCase(), version: info.version }; // Home nests it under its Safe
   if (!info.supported) { root.append(h('p.mut', 'This implementation is identified but is not supported for permission decoding or editing.'), h('details', h('summary', 'Implementation'), addr(info.implementation), h('pre', info.code))); return root; }
   // The tabs sit right above what they switch: the history status, a link's proposal and the pending changes
   // concern the whole modifier and come first (`top`, which the editor fills).

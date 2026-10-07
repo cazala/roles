@@ -7,7 +7,7 @@ import { connector, provider as wcProvider } from './wc.js';
 import { qr, qrPath } from './qr.js';
 import { addRpc, explorerChoice, explorerDefaults, explorerProviders, reader, removeRpc, rpcs, setExplorer, WC_RPC } from './reads.js';
 import { nameOf, resolveName } from './names.js';
-import { identify, safeModules } from './roles.js';
+import { identify, safeModules, metadata } from './roles.js';
 import { load, store } from './store.js';
 import { labelsSheet, backupDialog } from './manage.js';
 import { LINK, gateway, savedGateway, keepGateway } from './handoff.js';
@@ -276,19 +276,29 @@ function newModifier() {
   put(body, h('p.mut.small', 'A Roles modifier gives roles permissions over a Safe’s assets. Which Safe is it for?'), h('label', 'Safe'), suggestInput(safe, known), h('div.dfoot', h('span.grow'), h('button', { onclick: close }, 'Cancel'), go), out);
   safe.focus();
 }
-/** Saved entries on the connected chain without a kind: a Roles modifier, a Safe, or another contract. Returns how many were classified. */
+/**
+ * Saved entries on the connected chain saved before kinds and facts were recorded: what each is (a Roles modifier,
+ * a Safe, or another contract) and its facts (a Safe's threshold and owners, a modifier's Safe). Returns how many changed.
+ */
 async function classify() {
-  const p = session.provider, todo = saved.filter((x) => !x.kind && x.chain === session.chain);
+  const p = session.provider, todo = saved.filter((x) => x.chain === session.chain && (!x.kind || ((x.kind === 'safe' || x.kind === 'roles') && !x.facts)));
   if (!p || !todo.length) return 0;
   const request = (method, params = []) => p.request({ method, params });
+  let n = 0;
   for (const x of todo) {
     try {
       const info = await identify(request, x.address);
-      x.kind = info.code === '0x' ? 'none' : info.version ? 'roles' : (await safeModules(request, x.address).then(() => 'safe', () => 'other'));
+      if (info.code === '0x') x.kind = 'none';
+      else if (info.version) (x.kind = 'roles'), (x.facts = { avatar: (await metadata(request, x.address, 'latest')).avatar.toLowerCase(), version: info.version });
+      else {
+        const s = await safeModules(request, x.address).catch(() => null);
+        (x.kind = s ? 'safe' : 'other'), s && (x.facts = { threshold: Number(s.threshold), owners: s.owners.length });
+      }
+      n++;
     } catch {}
   }
-  save();
-  return todo.filter((x) => x.kind).length;
+  if (n) save();
+  return n;
 }
 const reloadHome = () => { saved = load('saved', []).filter((x) => x && isAddr(x.address) && Number.isSafeInteger(x.chain)); route(); };
 function home() {
@@ -307,7 +317,9 @@ function home() {
   const rows = h('div'), out = h('div'), openRow = h('div');
   // The network only where it tells you something: not on items of the connected chain.
   const showChain = (x) => (session.chain ? x.chain !== session.chain : new Set(saved.map((y) => y.chain)).size > 1);
-  const row = (x) => {
+  // Each row says what it is: a Safe (shield, "Safe · 3 of 5") or a Roles modifier (people), nested under its Safe
+  // when that Safe is saved too, else on its own with "for <Safe>".
+  const row = (x, child) => {
     const title = labels.get(x.address) || short(x.address), name = h('b.name', title);
     const rename = () => {
       const inp = h('input.rename', { value: labels.get(x.address) || '', placeholder: 'Name this address', maxlength: 40 });
@@ -318,16 +330,31 @@ function home() {
       name.replaceWith(inp); inp.focus(); inp.select();
     };
     const remove = () => { saved = saved.filter((y) => y !== x); save(); draw(); put(out, h('p.small', 'Removed ' + title + '. ', h('button.link', { onclick: () => { saved.push(x); save(); draw(); put(out); } }, 'Undo'))); };
-    return h('a.srow' + (session.chain && x.chain !== session.chain ? '.other' : ''), { href: '#/' + x.address + '?chain=' + x.chain, onclick: () => (intent = true), title: session.chain && x.chain !== session.chain ? 'On ' + network(x.chain) : null },
-      name, labels.get(x.address) && h('code.sa', short(x.address)), showChain(x) && h('span.chip', network(x.chain)), h('span.grow'),
-      h('span.acts', iconButton('edit', 'Rename', rename), iconButton('close', 'Remove from this list', remove)), h('span.go', icon(...ICONS.next)));
+    const f = x.facts || {}, safe = x.kind === 'safe', roles = x.kind === 'roles';
+    // A modifier on its own names its Safe, which opens it (a link inside the row's link would be invalid).
+    const forSafe = roles && !child && f.avatar && h('span.forsafe', { role: 'link', tabindex: 0, title: 'Open ' + f.avatar, onclick: (e) => (e.preventDefault(), e.stopPropagation(), (intent = true), (location.hash = '/' + f.avatar + '?chain=' + x.chain)) }, labels.get(f.avatar) || short(f.avatar));
+    const what = safe ? 'Safe' + (f.owners ? ' · ' + f.threshold + ' of ' + f.owners : '') : roles ? ['Roles' + (f.version ? ' ' + f.version : ''), forSafe && [' · for ', forSafe]] : null;
+    return h('a.srow' + (child ? '.child' : '') + (session.chain && x.chain !== session.chain ? '.other' : ''), { href: '#/' + x.address + '?chain=' + x.chain, onclick: () => (intent = true), title: session.chain && x.chain !== session.chain ? 'On ' + network(x.chain) : null, style: child ? '--d:1' : null },
+      h('span.kind', (safe || roles) && icon(...ICONS[safe ? 'shield' : 'people'])), name, labels.get(x.address) && h('code.sa', short(x.address)), showChain(x) && h('span.chip', network(x.chain)), h('span.grow'),
+      what && h('span.what', what), h('span.acts', iconButton('edit', 'Rename', rename), iconButton('close', 'Remove from this list', remove)), h('span.go', icon(...ICONS.next)));
   };
   const draw = () => {
     const s = q.value.trim(), lower = s.toLowerCase();
-    const found = saved.filter((x) => (x.address + ' ' + (labels.get(x.address) || '')).toLowerCase().includes(lower));
-    put(openRow, isRef(lower) && !found.some((x) => x.address === lower) ? h('div.slist.openlist', h('a.srow', { href: '#/' + lower, onclick: (e) => (e.preventDefault(), openRef(s)) }, h('span.mut', 'Open'), h('b.name', isAddr(lower) ? short(lower) : lower), h('span.grow'), h('span.go', icon(...ICONS.next)))) : null);
-    put(rows, found.length ? h('div.slist', found.map(row)) : !isRef(lower) && h('p.empty', 'No saved address matches. Paste a 0x address or a .eth / .wei name to open one.'));
+    const hit = (x) => (x.address + ' ' + (labels.get(x.address) || '')).toLowerCase().includes(lower);
+    // A modifier's parent: its Safe, saved on the same chain.
+    const parentOf = (m) => m.kind === 'roles' && m.facts?.avatar && saved.find((y) => y.kind === 'safe' && y.chain === m.chain && y.address === m.facts.avatar);
+    const kids = (p) => saved.filter((m) => parentOf(m) === p);
+    const tops = saved.filter((x) => !parentOf(x));
+    // A match on a modifier keeps its Safe above it; a match on a Safe keeps its modifiers.
+    const list = tops.flatMap((t) => {
+      const all = kids(t), shown = !lower || hit(t) ? all : all.filter(hit);
+      return !lower || hit(t) || shown.length ? [row(t, false), ...shown.map((k) => row(k, true))] : [];
+    });
+    put(openRow, isRef(lower) && !saved.some((x) => x.address === lower) ? h('div.slist.openlist', h('a.srow', { href: '#/' + lower, onclick: (e) => (e.preventDefault(), openRef(s)) }, h('span.mut', 'Open'), h('b.name', isAddr(lower) ? short(lower) : lower), h('span.grow'), h('span.go', icon(...ICONS.next)))) : null);
+    put(rows, list.length ? h('div.slist', list) : !isRef(lower) && h('p.empty', 'No saved address matches. Paste a 0x address or a .eth / .wei name to open one.'));
   };
+  // Entries saved before kinds and facts were recorded: looked up once with a wallet, then the list redraws.
+  classify().then((n) => n && rows.isConnected && draw());
   q.oninput = draw;
   q.onkeydown = (e) => {
     if (e.key === 'Escape') (q.value = ''), draw();
@@ -362,7 +389,9 @@ export async function route() {
     if (epoch !== session.epoch) return;
     // Remembered with what it is (a Safe or a Roles modifier), so the Safe picker lists only Safes.
     const mine = saved.find(x => x.address === address && x.chain === session.chain);
-    if (!mine) { saved.unshift({ address, chain: session.chain, kind: view.kind }); save(); } else if (view.kind && mine.kind !== view.kind) { mine.kind = view.kind; save(); }
+    // Its facts too (a Safe's threshold and owners; a modifier's Safe), for Home.
+    if (!mine) { saved.unshift({ address, chain: session.chain, kind: view.kind, facts: view.facts }); save(); }
+    else if (view.kind && (mine.kind !== view.kind || JSON.stringify(mine.facts) !== JSON.stringify(view.facts))) { mine.kind = view.kind; mine.facts = view.facts; save(); }
     put($('crumb'), h('span.mut', '/'), h('a', { href: '#/' + address }, labels.get(address) || short(address)));
     put(main, view);
   } catch (e) { if (epoch === session.epoch) put(main, bad(friendlyError(e)), h('a', { href: '#/' }, 'Open another address')); }

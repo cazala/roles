@@ -250,6 +250,13 @@ a.srow.other { opacity: .6; }
 .srow .chip { padding: 0 7px; font-size: 11px; white-space: nowrap; }
 .srow .go { display: inline-flex; color: var(--mut); }
 .srow .go svg { width: 16px; height: 16px; }
+/* Home: what each row is (a Safe's shield, a modifier's people), its facts on the right, modifiers under their Safe. */
+.srow .kind { display: inline-flex; flex: none; width: 16px; color: var(--mut); }
+.srow .kind svg { width: 16px; height: 16px; }
+.srow .what { color: var(--mut); font-size: 12px; white-space: nowrap; }
+.srow .forsafe { color: var(--fg); text-decoration: underline; text-decoration-color: var(--line); cursor: pointer; }
+.srow .forsafe:hover { text-decoration-color: var(--fg); }
+.slist .srow.child { border-top-style: dashed; }
 .srow.removed { border-style: dashed; color: var(--mut); }
 .srow .count { padding: 0 7px; border-radius: 999px; background: var(--bg); color: var(--mut); font-size: 11px; line-height: 18px; }
 .kids { border-top: 1px solid var(--line); }
@@ -698,3 +705,9 @@ nav.mtabs .tact { display: inline-flex; padding: 4px 0 6px; }
 
 /* A Safe that already has a working Roles modifier: creating another is a quiet link under its modules. */
 p.another { margin: 10px 0 0; font-size: 13px; }
+
+/* A page's title (your label, its name, or the kind and short address), then what it is on one muted line. */
+h1.ptitle { margin-bottom: 4px; overflow-wrap: anywhere; }
+p.pmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin: 0 0 14px; font-size: 14px; }
+h2.psec { margin: 22px 0 10px; font-size: 15px; }
+p.pmeta .paddr { display: inline-flex; align-items: center; gap: 2px; }
