@@ -321,7 +321,16 @@ export function suggestInput(input,list) {
     rows=found.slice(0,100);at=-1;
     put(box,rows.map(([a,l],i)=>h('button.sopt',{type:'button',role:'option',onpointerdown:e=>e.preventDefault(),onclick:()=>pick(a)},h('b',l),h('code',short(a)))),found.length>rows.length&&h('p.mut.small',(found.length-rows.length)+' more: type to filter'),!rows.length&&all.length>0&&q&&h('p.mut.small','No label matches. Paste the 0x address.'));
     box.hidden=!rows.length||(/^0x[0-9a-fA-F]{40}$/.test(input.value.trim())&&rows.some(([a])=>a===input.value.trim().toLowerCase()));
+    place();
   };
+  // In a dialog (which scrolls), the list floats over it, fixed under the input, instead of growing or scrolling it.
+  const place=()=>{
+    const d=input.closest('dialog');if(!d||box.hidden)return;
+    const r=input.getBoundingClientRect();box.classList.add('float');
+    Object.assign(box.style,{left:r.left+'px',top:(r.bottom+4)+'px',width:r.width+'px',maxHeight:Math.max(120,Math.min(232,innerHeight-r.bottom-16))+'px'});
+    if(!d.dataset.floats){d.dataset.floats='1';d.addEventListener('scroll',()=>d.querySelectorAll('.suggest.float:not([hidden])').forEach(b=>b.reposition?.()));}
+  };
+  box.reposition=place;addEventListener('resize',()=>box.isConnected&&place());
   const move=d=>{if(!rows.length)return;at=(at+d+rows.length)%rows.length;box.querySelectorAll('.sopt').forEach((b,i)=>b.classList.toggle('on',i===at));box.querySelectorAll('.sopt')[at].scrollIntoView({block:'nearest'});};
   input.addEventListener('focus',draw);input.addEventListener('input',draw);
   input.addEventListener('blur',()=>setTimeout(()=>box.hidden=true,100));

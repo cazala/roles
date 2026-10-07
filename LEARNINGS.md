@@ -53,6 +53,7 @@ Everything below was learned the hard way while building safe.wei (`~/Code/safe`
 - Pin `FORK_BLOCK` for reproducible fork tests; publicnode works for mainnet; Polygon and L2 forks need an archive RPC to live long.
 - Use `viem` only in tests, as a reference implementation to compare against (encoders, hashes, typed data).
 - Fork runs of the deploy script must never write the mainnet record (`deploy/1.json`); forks write gitignored `deploy/local-*.json`.
+- **The in-app browser's `type` action inserts text without key events**, so it cannot catch a keydown handler that cancels keystrokes (a Block explorer and a Create a Safe field shipped that way: nothing could be typed). When a field has a keydown handler, press real keys (the `key` action) at least once and read the input's value.
 - The in-app browser's screenshots can be stale after scrolling. Verify layout with DOM measurements (`getBoundingClientRect`, `elementFromPoint`) or scroll to the top first.
 
 ### Build, size, deploy

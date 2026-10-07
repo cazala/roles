@@ -7,6 +7,7 @@ import { connector, provider as wcProvider } from './wc.js';
 import { qr, qrPath } from './qr.js';
 import { addRpc, explorerChoice, explorerDefaults, explorerProviders, reader, removeRpc, rpcs, setExplorer, WC_RPC } from './reads.js';
 import { nameOf, resolveName } from './names.js';
+import { identify, safeModules } from './roles.js';
 import { load, store } from './store.js';
 import { labelsSheet, backupDialog } from './manage.js';
 import { LINK, gateway, savedGateway, keepGateway } from './handoff.js';
@@ -207,7 +208,8 @@ export function settingsDialog() {
     if (!ready(id)) (id === 'custom' ? xurl : xkey).focus();
   };
   xkey.oninput = xurl.oninput = () => (dirty(), put(xsave, 'Save'));
-  xkey.onkeydown = xurl.onkeydown = (e) => e.key === 'Enter' && !xsave.disabled && xsave.click();
+  // A block, not `e.key === 'Enter' && …`: an on-handler returning false cancels the keystroke, so nothing could be typed.
+  xkey.onkeydown = xurl.onkeydown = (e) => { if (e.key === 'Enter' && !xsave.disabled) xsave.click(); };
   xsave.onclick = () => {
     put(xout);
     try { setExplorer({ id: xpick.value, url: xurl.value, key: xkey.value }); done(); shape(); put(xsave, 'Saved ✓'); }
@@ -268,9 +270,25 @@ function newModifier() {
   go.onclick = act(go, async () => { const v = safe.value.trim().toLowerCase(); if (!isRef(v)) throw Error('Enter the Safe’s 0x address or name.'); close(); intent = true; location.hash = '/' + v + '?create'; }, out);
   // Enter continues, unless the suggestions used it to pick one (they handle it later in the same keypress).
   safe.onkeydown = (e) => { if (e.key === 'Enter') setTimeout(() => e.defaultPrevented || go.click()); }; // never return false here: that cancels every keystroke
-  const known = saved.filter((x, i) => saved.findIndex((y) => y.address === x.address) === i).map((x) => [x.address, labels.get(x.address) || network(x.chain)]);
-  put(body, h('p.mut.small', 'A Roles modifier gives roles permissions over a Safe’s assets. Which Safe is it for?'), h('label', 'Safe'), suggestInput(safe, () => known), h('div.dfoot', h('span.grow'), h('button', { onclick: close }, 'Cancel'), go), out);
+  // Only your Safes: a modifier is not a Safe. Entries saved before kinds were recorded are checked onchain.
+  const known = () => saved.filter((x, i) => x.kind === 'safe' && saved.findIndex((y) => y.address === x.address && y.kind === 'safe') === i).map((x) => [x.address, labels.get(x.address) || network(x.chain)]);
+  classify().then((n) => n && document.activeElement === safe && safe.dispatchEvent(new Event('input')));
+  put(body, h('p.mut.small', 'A Roles modifier gives roles permissions over a Safe’s assets. Which Safe is it for?'), h('label', 'Safe'), suggestInput(safe, known), h('div.dfoot', h('span.grow'), h('button', { onclick: close }, 'Cancel'), go), out);
   safe.focus();
+}
+/** Saved entries on the connected chain without a kind: a Roles modifier, a Safe, or another contract. Returns how many were classified. */
+async function classify() {
+  const p = session.provider, todo = saved.filter((x) => !x.kind && x.chain === session.chain);
+  if (!p || !todo.length) return 0;
+  const request = (method, params = []) => p.request({ method, params });
+  for (const x of todo) {
+    try {
+      const info = await identify(request, x.address);
+      x.kind = info.code === '0x' ? 'none' : info.version ? 'roles' : (await safeModules(request, x.address).then(() => 'safe', () => 'other'));
+    } catch {}
+  }
+  save();
+  return todo.filter((x) => x.kind).length;
 }
 const reloadHome = () => { saved = load('saved', []).filter((x) => x && isAddr(x.address) && Number.isSafeInteger(x.chain)); route(); };
 function home() {
@@ -342,7 +360,9 @@ export async function route() {
     put(main, h('p.mut', 'Reading the chain…'));
     const view = await renderAddress(address, path.slice(1), epoch);
     if (epoch !== session.epoch) return;
-    if (!saved.some(x => x.address === address && x.chain === session.chain)) { saved.unshift({ address, chain: session.chain }); save(); }
+    // Remembered with what it is (a Safe or a Roles modifier), so the Safe picker lists only Safes.
+    const mine = saved.find(x => x.address === address && x.chain === session.chain);
+    if (!mine) { saved.unshift({ address, chain: session.chain, kind: view.kind }); save(); } else if (view.kind && mine.kind !== view.kind) { mine.kind = view.kind; save(); }
     put($('crumb'), h('span.mut', '/'), h('a', { href: '#/' + address }, labels.get(address) || short(address)));
     put(main, view);
   } catch (e) { if (epoch === session.epoch) put(main, bad(friendlyError(e)), h('a', { href: '#/' }, 'Open another address')); }
