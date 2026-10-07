@@ -207,7 +207,8 @@ export function settingsDialog() {
     if (!ready(id)) (id === 'custom' ? xurl : xkey).focus();
   };
   xkey.oninput = xurl.oninput = () => (dirty(), put(xsave, 'Save'));
-  xkey.onkeydown = xurl.onkeydown = (e) => e.key === 'Enter' && !xsave.disabled && xsave.click();
+  // A block, not `e.key === 'Enter' && …`: an on-handler returning false cancels the keystroke, so nothing could be typed.
+  xkey.onkeydown = xurl.onkeydown = (e) => { if (e.key === 'Enter' && !xsave.disabled) xsave.click(); };
   xsave.onclick = () => {
     put(xout);
     try { setExplorer({ id: xpick.value, url: xurl.value, key: xkey.value }); done(); shape(); put(xsave, 'Saved ✓'); }
